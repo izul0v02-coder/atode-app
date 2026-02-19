@@ -5,1135 +5,680 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>あとで</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap');
-
-  :root {
-    --bg: #f5f0e8;
-    --bg2: #ede7db;
-    --card: #faf7f2;
-    --card-done: #f0ebe2;
-    --brown-dark: #5c3d2e;
-    --brown-mid: #8b6347;
-    --brown-light: #c4a882;
-    --brown-pale: #ddd0bc;
-    --text: #3d2b1f;
-    --text-sub: #9c7e6a;
-    --border: #e2d8ca;
-    --shadow: rgba(92,61,46,0.08);
-    --orange: #e8673a;
-    --orange-light: #f5a07a;
-    --orange-pale: #fde8df;
-    --orange-bg: #fff6f2;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    font-family: 'Noto Sans JP', sans-serif;
-    color: var(--text);
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-  }
-
-  .app {
-    width: 100%;
-    max-width: 480px;
-    min-height: 100vh;
-    background: var(--bg);
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* ── Header ── */
-  .header {
-    background: var(--bg);
-    padding: 20px 20px 0;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-
-  .header-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-  }
-
-  .title-area { display: flex; align-items: center; gap: 10px; }
-
-  .app-title {
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--brown-dark);
-    letter-spacing: -0.5px;
-  }
-
-  .app-title::after {
-    content: '';
-    display: inline-block;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--orange);
-    margin-left: 3px;
-    margin-bottom: 6px;
-    vertical-align: bottom;
-  }
-
-  .task-count {
-    font-size: 12px; font-weight: 500;
-    color: var(--text-sub);
-    background: var(--bg2);
-    border-radius: 20px;
-    padding: 2px 10px;
-  }
-
-  .header-actions { display: flex; align-items: center; gap: 8px; }
-
-  .sort-btn {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 7px 14px;
-    font-size: 12px;
-    color: var(--brown-mid);
-    cursor: pointer;
-    font-family: 'Noto Sans JP', sans-serif;
-    transition: all 0.2s;
-    display: flex; align-items: center; gap: 5px;
-  }
-  .sort-btn.active { background: var(--brown-dark); color: #fff; border-color: var(--brown-dark); }
-
-  .add-btn {
-    background: var(--orange);
-    border: none;
-    border-radius: 20px;
-    width: 38px; height: 38px;
-    color: #fff; font-size: 24px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 3px 14px rgba(232,103,58,0.38);
-    transition: transform 0.15s, box-shadow 0.15s;
-    flex-shrink: 0;
-    padding-bottom: 1px;
-  }
-  .add-btn:hover { transform: scale(1.09); box-shadow: 0 5px 20px rgba(232,103,58,0.48); }
-
-  /* ── Tabs ── */
-  .tabs {
-    display: flex; gap: 4px;
-    padding: 10px 0 12px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .tab {
-    padding: 6px 13px;
-    border-radius: 20px;
-    font-size: 12px;
-    cursor: pointer; border: none;
-    font-family: 'Noto Sans JP', sans-serif;
-    transition: all 0.2s;
-    background: transparent; color: var(--text-sub);
-  }
-  .tab.active { background: var(--orange); color: #fff; box-shadow: 0 2px 8px rgba(232,103,58,0.3); }
-
-  /* ── List ── */
-  .list { flex: 1; padding: 4px 16px 60px; overflow-y: auto; }
-
-  .date-heading {
-    font-size: 11px; font-weight: 600;
-    color: var(--orange);
-    letter-spacing: 1px;
-    padding: 18px 4px 8px;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .date-heading::after {
-    content: ''; flex: 1; height: 1px;
-    background: linear-gradient(90deg, var(--orange-pale), transparent);
-  }
-
-  /* ── Task card ── */
-  .task-card {
-    background: var(--card);
-    border-radius: 16px;
-    padding: 13px 14px 13px 12px;
-    margin-bottom: 8px;
-    border: 1px solid var(--border);
-    border-left: 3px solid transparent;
-    box-shadow: 0 2px 8px var(--shadow);
-    display: flex; gap: 10px; align-items: flex-start;
-    transition: all 0.35s ease;
-    position: relative;
-  }
-  .task-card.urgent {
-    border-left-color: var(--orange);
-    background: linear-gradient(135deg, var(--orange-bg) 0%, var(--card) 70%);
-  }
-  .task-card.done {
-    background: var(--card-done);
-    opacity: 0.6; box-shadow: none;
-    border-left-color: transparent !important;
-  }
-  .task-card.done .task-title { text-decoration: line-through; color: var(--text-sub); }
-
-  /* ── Checkbox ── */
-  .checkbox-wrap {
-    position: relative;
-    flex-shrink: 0;
-    width: 22px; height: 22px;
-    margin-top: 2px;
-  }
-
-  .checkbox {
-    width: 22px; height: 22px;
-    border: 2px solid var(--brown-light);
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-    background: transparent;
-    position: relative; z-index: 1;
-  }
-  .task-card.urgent .checkbox { border-color: var(--orange-light); }
-  .checkbox.checked { background: var(--orange); border-color: var(--orange); animation: pop 0.25s ease; }
-
-  @keyframes pop {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.35); }
-    100% { transform: scale(1); }
-  }
-
-  .checkbox svg { display: none; }
-  .checkbox.checked svg { display: block; }
-
-  /* ── Sparkle ── */
-  .sparkle-container {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 20;
-  }
-
-  .sparkle { position: absolute; opacity: 0; border-radius: 50%; }
-  .sparkle.star {
-    border-radius: 0;
-    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-  }
-  .sparkle.diamond {
-    border-radius: 0;
-    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  }
-  .sparkle.active {
-    animation: sparkle-fly 0.8s cubic-bezier(0.25,0.46,0.45,0.94) forwards;
-  }
-
-  @keyframes sparkle-fly {
-    0% { transform: translate(0,0) scale(1.2) rotate(0deg); opacity: 1; }
-    40% { opacity: 1; }
-    100% { transform: translate(var(--tx), var(--ty)) scale(0) rotate(var(--rot)); opacity: 0; }
-  }
-
-  /* ── Praise bubble ── */
-  .praise-bubble {
-    position: absolute;
-    /* arrow tip stays centered on checkbox (11px = half of 22px checkbox) */
-    left: 11px;
-    bottom: 28px;
-    /* shift right so bubble doesn't clip; arrow pseudo stays at left:0 area */
-    transform: translateX(-12px);
-    background: var(--brown-dark);
-    color: #fff;
-    font-size: 13px;
-    font-weight: 700;
-    padding: 5px 12px;
-    border-radius: 20px;
-    white-space: nowrap;
-    pointer-events: none;
-    z-index: 50;
-    box-shadow: 0 4px 16px rgba(92,61,46,0.25);
-    animation: praise-pop 1.6s ease forwards;
-    letter-spacing: 0.3px;
-  }
-
-  /* Arrow points down, positioned so tip is above checkbox center */
-  .praise-bubble::after {
-    content: '';
-    position: absolute;
-    left: 12px;   /* lines up with checkbox center regardless of bubble width */
-    bottom: -6px;
-    width: 0; height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 7px solid var(--brown-dark);
-  }
-
-  @keyframes praise-pop {
-    0%   { opacity: 0; transform: translateX(-12px) scale(0.6) translateY(4px); }
-    12%  { opacity: 1; transform: translateX(-12px) scale(1.1) translateY(-2px); }
-    22%  { transform: translateX(-12px) scale(1) translateY(0); }
-    70%  { opacity: 1; transform: translateX(-12px) translateY(-6px); }
-    100% { opacity: 0; transform: translateX(-12px) translateY(-18px); }
-  }
-
-  /* ── Task content ── */
-  .urgent-mark {
-    font-size: 17px; color: var(--orange); font-weight: 800;
-    line-height: 1; flex-shrink: 0; margin-top: 2px; margin-right: -2px;
-    text-shadow: 0 0 8px rgba(232,103,58,0.3);
-  }
-
-  .task-content { flex: 1; min-width: 0; }
-
-  .task-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-
-  .task-title { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.4; flex: 1; transition: all 0.3s; }
-
-  .task-date-badge { font-size: 14px; font-weight: 700; color: var(--orange); white-space: nowrap; flex-shrink: 0; }
-
-  .task-meta {
-    display: flex; align-items: center; gap: 8px;
-    margin-top: 3px; flex-wrap: wrap;
-  }
-
-  .task-time-chip {
-    display: inline-flex; align-items: center; gap: 3px;
-    font-size: 11px; color: var(--brown-mid);
-    background: var(--bg2);
-    border-radius: 8px;
-    padding: 1px 7px;
-  }
-
-  .task-notif-icon {
-    font-size: 11px;
-    cursor: pointer;
-    opacity: 0.5;
-    transition: opacity 0.2s;
-    user-select: none;
-  }
-  .task-notif-icon:hover { opacity: 1; }
-  .task-notif-icon.on { opacity: 1; }
-
-  .task-memo { font-size: 12px; color: var(--text-sub); margin-top: 6px; line-height: 1.5; }
-
-  .task-tags { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
-
-  .tag {
-    background: var(--orange-pale); border-radius: 10px;
-    padding: 2px 8px; font-size: 10px; color: var(--orange); font-weight: 500;
-  }
-
-  /* ── Notification banner ── */
-  .notif-banner {
-    position: fixed;
-    top: 16px; left: 50%;
-    transform: translateX(-50%) translateY(-80px);
-    background: var(--brown-dark);
-    color: #fff;
-    padding: 12px 20px;
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(61,43,31,0.3);
-    z-index: 9999;
-    font-size: 14px;
-    font-weight: 500;
-    max-width: 340px;
-    width: 90%;
-    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
-    display: flex; align-items: center; gap: 10px;
-  }
-  .notif-banner.show { transform: translateX(-50%) translateY(0); }
-  .notif-banner-icon { font-size: 20px; flex-shrink: 0; }
-  .notif-banner-title { font-size: 12px; opacity: 0.7; margin-top: 2px; }
-
-  /* ── Empty ── */
-  .empty { text-align: center; padding: 60px 20px; color: var(--brown-light); font-size: 14px; }
-  .empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
-
-  /* ── Modal ── */
-  .modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(61,43,31,0.35);
-    z-index: 300;
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.25s;
-    padding: 20px;
-  }
-  .modal-overlay.open { opacity: 1; pointer-events: all; }
-
-  .modal {
-    background: var(--card);
-    border-radius: 24px;
-    padding: 26px 22px;
-    width: 100%; max-width: 420px;
-    transform: translateY(20px) scale(0.97);
-    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-    box-shadow: 0 16px 56px rgba(61,43,31,0.2);
-    max-height: 92vh; overflow-y: auto;
-  }
-  .modal-overlay.open .modal { transform: translateY(0) scale(1); }
-
-  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-
-  .modal h3 { font-size: 17px; font-weight: 700; color: var(--brown-dark); }
-
-  .modal-close {
-    background: var(--bg2); border: none; border-radius: 50%;
-    width: 30px; height: 30px; cursor: pointer;
-    font-size: 14px; color: var(--text-sub);
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.2s;
-  }
-  .modal-close:hover { background: var(--border); }
-
-  .form-group { margin-bottom: 13px; }
-
-  .form-label { font-size: 11px; color: var(--text-sub); margin-bottom: 5px; letter-spacing: 0.5px; font-weight: 500; }
-
-  .form-input, .form-textarea {
-    width: 100%;
-    background: var(--bg); border: 1px solid var(--border);
-    border-radius: 12px; padding: 10px 14px;
-    font-size: 14px; color: var(--text);
-    font-family: 'Noto Sans JP', sans-serif;
-    outline: none; transition: border-color 0.2s;
-  }
-  .form-input:focus, .form-textarea:focus { border-color: var(--orange-light); }
-  .form-textarea { resize: none; height: 70px; }
-
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-
-  /* Notification row in form */
-  .notif-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px;
-    background: var(--bg); border: 1.5px solid var(--border);
-    border-radius: 12px; transition: all 0.2s;
-  }
-  .notif-row.on { background: var(--orange-pale); border-color: var(--orange-light); }
-  .notif-row-label { font-size: 13px; color: var(--text-sub); flex: 1; }
-  .notif-row.on .notif-row-label { color: var(--orange); font-weight: 500; }
-
-  .toggle-switch {
-    width: 36px; height: 20px;
-    background: var(--border); border-radius: 10px;
-    position: relative; transition: background 0.2s; flex-shrink: 0; cursor: pointer;
-  }
-  .toggle-switch::after {
-    content: ''; width: 16px; height: 16px; border-radius: 50%;
-    background: #fff; position: absolute; top: 2px; left: 2px;
-    transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-  }
-  .notif-row.on .toggle-switch { background: var(--orange); }
-  .notif-row.on .toggle-switch::after { transform: translateX(16px); }
-
-  /* Urgent toggle */
-  .urgent-toggle {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px;
-    background: var(--bg); border: 1.5px solid var(--border);
-    border-radius: 12px; cursor: pointer; transition: all 0.2s; height: 42px;
-  }
-  .urgent-toggle.on { background: var(--orange-pale); border-color: var(--orange-light); }
-  .urgent-toggle-label { font-size: 13px; color: var(--text-sub); flex: 1; }
-  .urgent-toggle.on .urgent-toggle-label { color: var(--orange); font-weight: 600; }
-  .urgent-toggle .toggle-switch { cursor: pointer; }
-  .urgent-toggle.on .toggle-switch { background: var(--orange); }
-  .urgent-toggle.on .toggle-switch::after { transform: translateX(16px); }
-
-  /* Tag selector */
-  .tag-selector { display: flex; flex-wrap: wrap; gap: 6px; }
-
-  .tag-option {
-    padding: 5px 12px; border-radius: 20px; font-size: 12px;
-    border: 1.5px solid var(--border); background: var(--bg);
-    color: var(--text-sub); cursor: pointer;
-    font-family: 'Noto Sans JP', sans-serif;
-    transition: all 0.15s; user-select: none;
-  }
-  .tag-option.selected { background: var(--orange-pale); border-color: var(--orange-light); color: var(--orange); font-weight: 500; }
-  .tag-option.add-tag { border-style: dashed; color: var(--brown-light); }
-
-  .tag-custom-input { display: none; width: 100%; margin-top: 6px; }
-  .tag-custom-input.visible { display: block; }
-
-  .btn-submit {
-    width: 100%; background: var(--orange); color: #fff;
-    border: none; border-radius: 14px; padding: 13px;
-    font-size: 14px; font-weight: 600; cursor: pointer;
-    font-family: 'Noto Sans JP', sans-serif;
-    margin-top: 6px;
-    transition: background 0.2s, transform 0.1s;
-    box-shadow: 0 3px 12px rgba(232,103,58,0.3);
-  }
-  .btn-submit:hover { background: #d45a2f; }
-  .btn-submit:active { transform: scale(0.98); }
-
-  /* Notif permission hint */
-  .notif-hint {
-    font-size: 11px; color: var(--orange-light);
-    margin-top: 5px; padding: 0 2px;
-    display: none;
-  }
-  .notif-hint.visible { display: block; }
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+  :root{--bg:#e8e8e8;--bg2:#dcdcdc;--card:#f4f4f4;--card-done:#d8d8d8;--text:#111;--text-sub:#888;--border:#d0d0d0;--shadow:rgba(0,0,0,.07);--accent:#111;--al:#444;--ap:#e0e0e0;--ab:#eeeeee;--dc:#111;}
+  [data-theme="mono"]{--bg:#e8e8e8;--bg2:#dcdcdc;--card:#f4f4f4;--card-done:#d8d8d8;--text:#111;--text-sub:#888;--border:#d0d0d0;--shadow:rgba(0,0,0,.07);--accent:#b8c400;--al:#ccda00;--ap:#eef590;--ab:#f5fac0;--dc:#b8c400;}
+  [data-theme="natural"]{--bg:#eeecea;--bg2:#e4e2de;--card:#f8f7f5;--card-done:#e4e2de;--text:#1a1a18;--text-sub:#8a8a84;--border:#dddbd6;--shadow:rgba(0,0,0,.06);--accent:#e05040;--al:#ec7a6e;--ap:#fbd8d4;--ab:#fff4f3;--dc:#e05040;}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);font-family:'Noto Sans JP',sans-serif;color:var(--text);min-height:100vh;display:flex;justify-content:center;transition:background .4s,color .4s;}
+  .app{width:100%;max-width:480px;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;padding-bottom:90px;transition:background .4s;}
+  /* Header */
+  .header{background:var(--bg);padding:20px 20px 0;position:sticky;top:0;z-index:100;transition:background .4s;}
+  .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .title-area{display:flex;align-items:center;gap:10px;}
+  .app-title{font-family:'DM Sans',sans-serif;font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.5px;}
+  .title-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-left:1px;margin-bottom:5px;vertical-align:bottom;transition:background .4s;}
+  .task-count{font-size:12px;font-weight:500;color:var(--text-sub);background:var(--bg2);border-radius:20px;padding:2px 10px;}
+  .header-actions{display:flex;align-items:center;gap:8px;}
+  .sort-btn{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;color:var(--text-sub);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .2s;display:flex;align-items:center;gap:4px;}
+  .sort-btn.active{background:var(--text);color:var(--bg);border-color:var(--text);}
+  .add-btn{background:var(--accent);border:none;border-radius:20px;width:36px;height:36px;color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.15);transition:transform .15s,background .4s;flex-shrink:0;}
+  .add-btn:active{transform:scale(.93);}
+  .theme-btn{width:30px;height:30px;border-radius:50%;border:2px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .2s;font-family:'DM Sans',sans-serif;font-weight:700;color:var(--text-sub);}
+  /* Theme panel */
+  .theme-panel{position:fixed;top:62px;right:calc(50% - min(240px,50% - 16px));background:var(--card);border:1px solid var(--border);border-radius:18px;padding:8px 10px;box-shadow:0 8px 28px var(--shadow);z-index:400;display:none;flex-direction:row;gap:6px;align-items:center;transition:background .4s;}
+  .theme-panel.open{display:flex;}
+  .theme-option{padding:3px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .18s;}
+  .theme-option.active{border-color:var(--accent);}
+  .theme-dot{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(0,0,0,.1);}
+  /* Tabs */
+  .tabs{display:flex;gap:4px;padding:10px 0 12px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{padding:5px 12px;border-radius:20px;font-size:12px;white-space:nowrap;cursor:pointer;border:none;font-family:'Noto Sans JP',sans-serif;transition:all .2s;background:transparent;color:var(--text-sub);flex-shrink:0;}
+  .tab.active{background:var(--accent);color:#fff;}
+  /* Habit */
+  .habit-section{padding:14px 16px 0;}
+  .habit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .habit-month-btn{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--text-sub);background:transparent;border:1px solid var(--border);border-radius:10px;padding:3px 10px;cursor:pointer;letter-spacing:.5px;transition:all .2s;}
+  .habit-month-btn:hover{background:var(--bg2);color:var(--text);}
+  .habit-manage-btn{font-size:11px;color:var(--text-sub);background:transparent;border:none;cursor:pointer;padding:3px 6px;font-family:'Noto Sans JP',sans-serif;}
+  .habit-table{width:100%;border-collapse:separate;border-spacing:0;}
+  .habit-table th{font-size:9px;color:var(--text-sub);font-weight:500;text-align:center;padding-bottom:4px;}
+  .habit-lbl-cell{width:56px;padding-right:6px;}
+  .habit-lbl-inner{display:flex;flex-direction:column;align-items:flex-end;width:52px;}
+  .habit-emoji{display:none;}
+  .habit-name-txt{font-size:9px;color:var(--text-sub);max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+  .habit-dot-cell{text-align:center;padding:5px 1px;}
+  .h-dot{width:11px;height:11px;border-radius:50%;background:var(--bg2);border:1.5px solid var(--border);cursor:pointer;transition:all .18s;display:inline-block;}
+  .h-dot.today-dot{border-color:var(--dc,var(--accent));border-width:2px;}
+  .h-dot.checked{background:var(--dc,var(--accent));border-color:var(--dc,var(--accent));}
+  .h-dot.future{opacity:.2;cursor:default;pointer-events:none;}
+  .habit-date-row td{font-size:9px;color:var(--text-sub);text-align:center;padding-bottom:4px;}
+  .habit-date-today{color:var(--accent);font-weight:700;}
+  /* Task list */
+  .list{flex:1;padding:4px 16px 20px;}
+  .date-heading{font-size:11px;font-weight:600;color:var(--accent);letter-spacing:1px;padding:16px 4px 8px;display:flex;align-items:center;gap:8px;}
+  .date-heading::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--ap),transparent);}
+  .task-card{background:var(--card);border-radius:14px;padding:12px 38px 12px 12px;margin-bottom:7px;border:1px solid var(--border);border-left:3px solid transparent;box-shadow:0 1px 6px var(--shadow);display:flex;gap:10px;align-items:flex-start;transition:all .3s;position:relative;cursor:pointer;}
+  .task-card:active{transform:scale(.98);}
+  .task-card.urgent{border-left-color:var(--accent);background:linear-gradient(135deg,var(--ab) 0%,var(--card) 60%);}
+  .task-card.done{background:var(--card-done);opacity:.55;box-shadow:none;border-left-color:transparent!important;}
+  .task-card.done .task-title{text-decoration:line-through;color:var(--text-sub);}
+  .card-del-btn{position:absolute;right:8px;bottom:7px;width:24px;height:24px;border-radius:50%;background:transparent;border:none;color:var(--text-sub);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:.35;transition:all .2s;}
+  .card-del-btn:hover{background:rgba(220,50,50,.1);color:#e04040;opacity:1;}
+  .cb-wrap{position:relative;flex-shrink:0;width:20px;height:20px;margin-top:2px;}
+  .cb{width:20px;height:20px;border:2px solid var(--border);border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;background:transparent;}
+  .task-card.urgent .cb{border-color:var(--al);}
+  .cb.checked{background:var(--accent);border-color:var(--accent);animation:pop .22s ease;}
+  @keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+  .cb svg{display:none;}.cb.checked svg{display:block;}
+  .sp-container{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:20;}
+  .sp{position:absolute;opacity:0;border-radius:50%;}
+  .sp.star{border-radius:0;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);}
+  .sp.active{animation:sfly .75s cubic-bezier(.25,.46,.45,.94) forwards;}
+  @keyframes sfly{0%{transform:translate(0,0) scale(1.2);opacity:1}40%{opacity:1}100%{transform:translate(var(--tx),var(--ty)) scale(0) rotate(var(--rot));opacity:0}}
+  .praise{position:absolute;left:10px;bottom:26px;transform:translateX(-8px);background:var(--text);color:var(--bg);font-size:12px;font-weight:700;padding:4px 10px;border-radius:18px;white-space:nowrap;pointer-events:none;z-index:50;animation:pbop 1.6s ease forwards;}
+  .praise::after{content:'';position:absolute;left:10px;bottom:-5px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--text);}
+  @keyframes pbop{0%{opacity:0;transform:translateX(-8px) scale(.7) translateY(4px)}12%{opacity:1;transform:translateX(-8px) scale(1.05) translateY(-1px)}22%{transform:translateX(-8px) scale(1)}70%{opacity:1;transform:translateX(-8px) translateY(-4px)}100%{opacity:0;transform:translateX(-8px) translateY(-14px)}}
+  .urgent-mark{font-size:15px;color:var(--accent);font-weight:800;flex-shrink:0;margin-top:2px;}
+  .task-content{flex:1;min-width:0;}
+  .task-header{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;}
+  .task-title{font-size:14px;font-weight:500;color:var(--text);line-height:1.4;flex:1;}
+  .task-date{font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap;flex-shrink:0;}
+  .task-meta{display:flex;align-items:center;gap:8px;margin-top:3px;}
+  .time-chip{font-size:11px;color:var(--text-sub);background:var(--bg2);border-radius:8px;padding:1px 6px;}
+  .notif-icon{font-size:11px;cursor:pointer;opacity:.5;transition:opacity .2s;}
+  .notif-icon.on{opacity:1;}
+  .task-memo{font-size:12px;color:var(--text-sub);margin-top:5px;line-height:1.5;}
+  .task-tags{display:flex;gap:4px;margin-top:6px;}
+  .tag{background:var(--ap);border-radius:8px;padding:2px 7px;font-size:10px;color:var(--accent);font-weight:500;}
+  .notif-banner{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-80px);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:14px;z-index:9999;font-size:14px;font-weight:500;max-width:320px;width:90%;transition:transform .4s cubic-bezier(.34,1.56,.64,1);display:flex;align-items:center;gap:8px;}
+  .notif-banner.show{transform:translateX(-50%) translateY(0);}
+  .empty{text-align:center;padding:50px 20px;color:var(--text-sub);font-size:14px;}
+  .empty-icon{font-size:36px;margin-bottom:10px;opacity:.4;}
+  /* Bottom bar */
+  .bottom-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--card);border-top:1px solid var(--border);padding:10px 16px 24px;z-index:200;box-shadow:0 -4px 16px var(--shadow);transition:background .4s;}
+  .bottom-add-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:14px;padding:13px;font-size:15px;font-weight:600;cursor:pointer;font-family:'Noto Sans JP',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;transition:filter .2s,transform .1s;}
+  .bottom-add-btn:active{transform:scale(.98);}
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .22s;padding:20px;}
+  .modal-overlay.open{opacity:1;pointer-events:all;}
+  .modal{background:var(--card);border-radius:22px;padding:22px 20px;width:100%;max-width:420px;transform:translateY(18px) scale(.97);transition:transform .3s cubic-bezier(.34,1.56,.64,1),background .4s;box-shadow:0 14px 50px rgba(0,0,0,.18);max-height:90vh;overflow-y:auto;}
+  .modal-overlay.open .modal{transform:translateY(0) scale(1);}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .modal h3{font-size:16px;font-weight:700;color:var(--text);}
+  .modal-close{background:var(--bg2);border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:13px;color:var(--text-sub);display:flex;align-items:center;justify-content:center;}
+  .form-group{margin-bottom:12px;}
+  .form-label{font-size:11px;color:var(--text-sub);margin-bottom:4px;font-weight:500;}
+  .form-input,.form-textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color .2s,background .4s;}
+  .form-input:focus,.form-textarea:focus{border-color:var(--al);}
+  .form-textarea{resize:none;height:64px;overflow:hidden;}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .notif-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;}
+  .notif-row.on{background:var(--ap);border-color:var(--al);}
+  .notif-row-label{font-size:13px;color:var(--text-sub);flex:1;}
+  .notif-row.on .notif-row-label{color:var(--accent);font-weight:500;}
+  .tsw{width:34px;height:19px;background:var(--border);border-radius:10px;position:relative;transition:background .2s;flex-shrink:0;}
+  .tsw::after{content:'';width:15px;height:15px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.15);}
+  .notif-row.on .tsw{background:var(--accent);}
+  .notif-row.on .tsw::after{transform:translateX(15px);}
+  .urgent-toggle{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;height:40px;}
+  .urgent-toggle.on{background:var(--ap);border-color:var(--al);}
+  .utl{font-size:13px;color:var(--text-sub);flex:1;}
+  .urgent-toggle.on .utl{color:var(--accent);font-weight:600;}
+  .urgent-toggle.on .tsw{background:var(--accent);}
+  .urgent-toggle.on .tsw::after{transform:translateX(15px);}
+  .tag-selector{display:flex;flex-wrap:wrap;gap:5px;}
+  .tag-option{padding:4px 10px;border-radius:18px;font-size:12px;border:1.5px solid var(--border);background:var(--bg);color:var(--text-sub);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;}
+  .tag-option.selected{background:var(--ap);border-color:var(--al);color:var(--accent);font-weight:500;}
+  .tag-option.add-tag{border-style:dashed;}
+  .tag-custom-input{display:none;width:100%;margin-top:5px;}
+  .tag-custom-input.visible{display:block;}
+  .btn-submit{width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-top:4px;transition:filter .2s;}
+  .btn-del-task{width:100%;background:transparent;color:#e04040;border:1.5px solid #e04040;border-radius:12px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-top:6px;}
+  .notif-hint{font-size:11px;color:var(--al);margin-top:4px;display:none;}
+  .notif-hint.visible{display:block;}
+  /* Confirm */
+  .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;padding:20px;}
+  .confirm-overlay.open{opacity:1;pointer-events:all;}
+  .confirm-box{background:var(--card);border-radius:18px;padding:22px 20px;width:100%;max-width:300px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.18);transform:scale(.9);transition:transform .22s cubic-bezier(.34,1.56,.64,1),background .4s;}
+  .confirm-overlay.open .confirm-box{transform:scale(1);}
+  .ci{font-size:32px;margin-bottom:8px;}
+  .ct{font-size:15px;font-weight:700;color:var(--text);margin-bottom:5px;}
+  .cs{font-size:12px;color:var(--text-sub);margin-bottom:18px;line-height:1.5;}
+  .cb-btns{display:flex;gap:8px;}
+  .cc{flex:1;background:var(--bg2);border:none;border-radius:10px;padding:11px;font-size:13px;color:var(--text-sub);cursor:pointer;font-family:'Noto Sans JP',sans-serif;}
+  .cd{flex:1;background:#e04040;border:none;border-radius:10px;padding:11px;font-size:13px;color:#fff;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-weight:600;}
+  /* Sheet */
+  .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:400;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+  .sheet-overlay.open{opacity:1;pointer-events:all;}
+  .sheet{background:var(--card);border-radius:22px 22px 0 0;width:100%;max-width:480px;padding:14px 16px 40px;transform:translateY(100%);transition:transform .32s cubic-bezier(.34,1.2,.64,1),background .4s;max-height:85vh;overflow-y:auto;}
+  .sheet-overlay.open .sheet{transform:translateY(0);}
+  .sh{width:34px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;}
+  .sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .sheet-title{font-size:15px;font-weight:700;color:var(--text);}
+  .sheet-close{background:var(--bg2);border:none;border-radius:50%;width:28px;height:28px;font-size:13px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .hi-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .hi-row:last-child{border-bottom:none;}
+  .hi-dh{color:var(--text-sub);font-size:16px;cursor:grab;padding:0 2px;touch-action:none;}
+  .hi-em{font-size:20px;}.hi-nm{flex:1;font-size:14px;color:var(--text);}
+  .hi-del{background:none;border:none;color:var(--text-sub);font-size:16px;cursor:pointer;padding:4px;opacity:.5;}
+  .hi-del:hover{opacity:1;color:#e04040;}
+  .add-hr{display:flex;gap:8px;margin-top:14px;}
+  .add-em-btn{width:46px;font-size:20px;text-align:center;border:1px solid var(--border);border-radius:10px;background:var(--bg);cursor:pointer;flex-shrink:0;}
+  .add-nm-inp{flex:1;}
+  .add-btn-s{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:0 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap;}
+  /* Emoji */
+  .emo-overlay{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.3);}
+  .emo-overlay.open{display:flex;}
+  .emo-box{background:var(--card);border-radius:18px;padding:16px;max-width:300px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.2);}
+  .emo-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;}
+  .emo-cell{font-size:22px;text-align:center;padding:5px;border-radius:8px;cursor:pointer;transition:background .15s;}
+  .emo-cell:hover{background:var(--bg2);}
+  /* Graph */
+  .graph-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:400;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+  .graph-overlay.open{opacity:1;pointer-events:all;}
+  .graph-sheet{background:var(--card);border-radius:22px 22px 0 0;width:100%;max-width:480px;padding:14px 16px 40px;transform:translateY(100%);transition:transform .32s cubic-bezier(.34,1.2,.64,1),background .4s;max-height:82vh;overflow-y:auto;}
+  .graph-overlay.open .graph-sheet{transform:translateY(0);}
+  .g-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .g-ml{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--text);}
+  .g-nb{background:var(--bg2);border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;color:var(--text-sub);}
+  .g-htabs{display:flex;gap:5px;margin-bottom:10px;overflow-x:auto;scrollbar-width:none;}
+  .g-htabs::-webkit-scrollbar{display:none;}
+  .g-ht{padding:4px 10px;border-radius:20px;font-size:12px;white-space:nowrap;cursor:pointer;border:1.5px solid var(--border);background:var(--bg2);color:var(--text-sub);flex-shrink:0;transition:all .15s;}
+  .g-ht.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .g-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+  .g-sc{background:var(--bg2);border-radius:12px;padding:10px 8px;text-align:center;}
+  .g-sn{font-family:'DM Sans',sans-serif;font-size:20px;font-weight:800;color:var(--accent);}
+  .g-sl{font-size:10px;color:var(--text-sub);margin-top:1px;}
+  .g-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px;}
+  .g-ch{text-align:center;font-size:9px;color:var(--text-sub);font-weight:600;padding:2px 0 4px;}
+  .g-cc{position:relative;display:flex;align-items:center;justify-content:center;padding:3px 0;font-size:11px;color:var(--text-sub);cursor:pointer;user-select:none;}
+  .g-cc::before{content:'';position:absolute;width:24px;height:24px;border-radius:50%;transition:background .15s;}
+  .g-cc span{position:relative;z-index:1;}
+  .g-cc.ck{color:#fff;font-weight:700;}.g-cc.ck::before{background:var(--dc,var(--accent));}
+  .g-cc.tc{color:var(--accent);font-weight:700;}.g-cc.tc::before{border:1.5px solid var(--accent);}
+  .g-cc.fut{opacity:.35;cursor:default;pointer-events:none;}
+  .g-cc.ec{visibility:hidden;cursor:default;pointer-events:none;}
+  .g-bt{font-size:10px;color:var(--text-sub);margin-bottom:6px;font-weight:600;letter-spacing:.5px;}
+  .g-br{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+  .g-bl{font-size:10px;color:var(--text-sub);width:22px;text-align:right;}
+  .g-btr{flex:1;height:7px;background:var(--bg2);border-radius:4px;overflow:hidden;}
+  .g-bf{height:100%;background:var(--accent);border-radius:4px;transition:width .5s cubic-bezier(.34,1.2,.64,1);}
+  .g-bc{font-size:10px;color:var(--text-sub);width:24px;text-align:right;}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-
 <div class="notif-banner" id="notifBanner">
-  <div class="notif-banner-icon">⏰</div>
-  <div>
-    <div id="notifBannerText">タスクの時間になりました</div>
-    <div class="notif-banner-title" id="notifBannerSub"></div>
-  </div>
+  <span>⏰</span>
+  <div><div id="notifBannerText"></div><div style="font-size:11px;opacity:.7" id="notifBannerSub"></div></div>
 </div>
-
+<div class="theme-panel" id="themePanel">
+  <div class="theme-option active" onclick="setTheme('default',this)"><div class="theme-dot" style="background:#111"></div></div>
+  <div class="theme-option" onclick="setTheme('mono',this)"><div class="theme-dot" style="background:#b8c400"></div></div>
+  <div class="theme-option" onclick="setTheme('natural',this)"><div class="theme-dot" style="background:#e05040"></div></div>
+</div>
 <div class="app">
   <div class="header">
     <div class="header-top">
       <div class="title-area">
-        <div class="app-title">あとで</div>
+        <div class="app-title">あとで<span class="title-dot"></span></div>
         <span class="task-count" id="taskCountBadge">0</span>
       </div>
       <div class="header-actions">
-        <button class="sort-btn" id="sortBtn" onclick="toggleSort()">
-          <span>↕</span>
-          <span id="sortLabel">日付順</span>
-        </button>
-        <button class="add-btn" onclick="openModal()" title="新しいタスク (⌘K)">+</button>
+        <button class="theme-btn" onclick="toggleThemePanel()">◐</button>
+        <button class="sort-btn" id="sortBtn" onclick="toggleSort()">↕ <span id="sortLabel">日付順</span></button>
+        <button class="add-btn" onclick="openAddModal()">+</button>
       </div>
     </div>
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('all', this)">すべて</button>
-      <button class="tab" onclick="switchTab('todo', this)">未完了</button>
-      <button class="tab" onclick="switchTab('done', this)">完了済み</button>
-      <button class="tab" onclick="switchTab('urgent', this)">⚡ 必須</button>
+      <button class="tab active" onclick="switchTab('all',this)">すべて</button>
+      <button class="tab" onclick="switchTab('todo',this)">未完了</button>
+      <button class="tab" onclick="switchTab('done',this)">完了済み</button>
+      <button class="tab" onclick="switchTab('urgent',this)">！ 必須</button>
     </div>
   </div>
-
+  <div class="habit-section">
+    <div class="habit-header">
+      <button class="habit-month-btn" onclick="openGraph()">Month</button>
+      <button class="habit-manage-btn" onclick="openManageSheet()">編集 ···</button>
+    </div>
+    <div id="habitTable"></div>
+  </div>
   <div class="list" id="taskList"></div>
 </div>
-
-<!-- Modal -->
+<div class="bottom-bar">
+  <button class="bottom-add-btn" onclick="openAddModal()"><span style="font-size:18px;font-weight:300">+</span> タスクを追加</button>
+</div>
+<!-- Task Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
   <div class="modal">
-    <div class="modal-header">
-      <h3>新しいタスク</h3>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-
-    <div class="form-group">
-      <div class="form-label">タイトル *</div>
-      <input class="form-input" id="inputTitle" type="text" placeholder="タスク名を入力">
-    </div>
-
-    <div class="form-group">
-      <div class="form-label">メモ</div>
-      <textarea class="form-textarea" id="inputMemo" placeholder="詳細メモ（任意）"></textarea>
-    </div>
-
+    <div class="modal-header"><h3 id="modalTitle">新しいタスク</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="form-group"><div class="form-label">タイトル *</div><input class="form-input" id="inputTitle" type="text" placeholder="タスク名を入力"></div>
+    <div class="form-group"><div class="form-label">メモ</div><textarea class="form-textarea" id="inputMemo" placeholder="メモ（任意）"></textarea></div>
     <div class="form-row">
-      <div class="form-group">
-        <div class="form-label">日付</div>
-        <input class="form-input" id="inputDate" type="date">
-      </div>
-      <div class="form-group">
-        <div class="form-label">時間（任意）</div>
-        <input class="form-input" id="inputTime" type="time">
-      </div>
+      <div class="form-group"><div class="form-label">日付</div><input class="form-input" id="inputDate" type="date"></div>
+      <div class="form-group"><div class="form-label">時間</div><input class="form-input" id="inputTime" type="time"></div>
     </div>
-
-    <!-- Notification toggle -->
-    <div class="form-group" id="notifGroup">
-      <div class="form-label">⏰ 時間通知</div>
-      <div class="notif-row" id="notifToggleRow" onclick="toggleNotif()">
-        <span class="notif-row-label" id="notifLabel">通知オフ</span>
-        <div class="toggle-switch"></div>
-      </div>
-      <div class="notif-hint" id="notifHint">※ 時間を入力すると通知が設定できます</div>
+    <div class="form-group">
+      <div class="form-label">⏰ 通知</div>
+      <div class="notif-row" id="notifToggleRow" onclick="toggleNotif()"><span class="notif-row-label" id="notifLabel">通知オフ</span><div class="tsw"></div></div>
+      <div class="notif-hint" id="notifHint">※ 時間を入力すると設定できます</div>
     </div>
-
     <div class="form-row">
-      <div class="form-group">
-        <div class="form-label">対応マスト</div>
-        <div class="urgent-toggle" id="urgentToggle" onclick="toggleUrgent()">
-          <span class="urgent-toggle-label" id="urgentLabel">オフ</span>
-          <div class="toggle-switch"></div>
-        </div>
-      </div>
-      <div class="form-group">
-        <div class="form-label">タグ</div>
-        <!-- placeholder for layout -->
-        <div style="height:42px;"></div>
-      </div>
+      <div class="form-group"><div class="form-label">対応マスト</div><div class="urgent-toggle" id="urgentToggle" onclick="toggleUrgent()"><span class="utl" id="urgentLabel">オフ</span><div class="tsw"></div></div></div>
+      <div class="form-group" style="visibility:hidden"></div>
     </div>
-
     <div class="form-group">
       <div class="form-label">タグ</div>
       <div class="tag-selector" id="tagSelector">
-        <div class="tag-option" onclick="selectTag(this, '仕事')">仕事</div>
-        <div class="tag-option" onclick="selectTag(this, '健康')">健康</div>
-        <div class="tag-option" onclick="selectTag(this, 'プライベート')">プライベート</div>
-        <div class="tag-option" onclick="selectTag(this, '買い物')">買い物</div>
-        <div class="tag-option" onclick="selectTag(this, '勉強')">勉強</div>
-        <div class="tag-option add-tag" onclick="showCustomTag()">＋ カスタム</div>
+        <div class="tag-option" onclick="selectTag(this,'仕事')">仕事</div>
+        <div class="tag-option" onclick="selectTag(this,'健康')">健康</div>
+        <div class="tag-option" onclick="selectTag(this,'プライベート')">プライベート</div>
+        <div class="tag-option" onclick="selectTag(this,'買い物')">買い物</div>
+        <div class="tag-option" onclick="selectTag(this,'勉強')">勉強</div>
+        <div class="tag-option add-tag" onclick="showCustomTag()">＋</div>
       </div>
-      <input class="form-input tag-custom-input" id="customTagInput" type="text" placeholder="タグ名を入力">
+      <input class="form-input tag-custom-input" id="customTagInput" type="text" placeholder="タグ名">
     </div>
-
-    <button class="btn-submit" onclick="addTask()">追加する</button>
+    <button class="btn-submit" id="submitBtn" onclick="submitModal()">追加する</button>
+    <button class="btn-del-task" id="deleteInModalBtn" onclick="deleteFromModal()" style="display:none">🗑 削除</button>
   </div>
 </div>
-
-
-<!-- Loading bar -->
-<style>
-  .loading-bar {
-    position: fixed; top: 0; left: 0; right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
-    background-size: 200% 100%;
-    animation: loading-slide 1.2s linear infinite;
-    z-index: 9999;
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-  @keyframes loading-slide {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-  .sync-indicator {
-    position: fixed; bottom: 20px; left: 50%;
-    transform: translateX(-50%);
-    background: var(--brown-dark);
-    color: #fff; font-size: 12px;
-    padding: 6px 14px; border-radius: 20px;
-    opacity: 0; transition: opacity 0.3s;
-    pointer-events: none; z-index: 500;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .sync-indicator.show { opacity: 1; }
-  .sync-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--orange);
-    animation: sync-pulse 1s ease infinite;
-  }
-  @keyframes sync-pulse {
-    0%,100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(0.7); }
-  }
-</style>
-<div class="loading-bar" id="loadingBar"></div>
-<div class="sync-indicator" id="syncIndicator"><div class="sync-dot"></div>同期中…</div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Confirm -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box"><div class="ci">🗑</div><div class="ct">削除しますか？</div><div class="cs" id="confirmSub"></div><div class="cb-btns"><button class="cc" onclick="closeConfirm()">キャンセル</button><button class="cd" onclick="confirmDelete()">削除</button></div></div>
+</div>
+<!-- Manage Sheet -->
+<div class="sheet-overlay" id="manageSheetOverlay" onclick="if(event.target===this)closeManageSheet()">
+  <div class="sheet">
+    <div class="sh"></div>
+    <div class="sheet-header"><span class="sheet-title">習慣の編集</span><button class="sheet-close" onclick="closeManageSheet()">✕</button></div>
+    <div id="habitItemList"></div>
+    <div class="add-hr">
+      <button class="form-input add-em-btn" id="emojiPickerBtn" onclick="openEmojiPicker()">😊</button>
+      <input class="form-input add-nm-inp" id="newHabitName" placeholder="習慣名（例: 運動）" type="text" onkeydown="if(event.key==='Enter')addHabitItem()">
+      <button class="add-btn-s" onclick="addHabitItem()">追加</button>
+    </div>
+  </div>
+</div>
+<!-- Emoji Picker -->
+<div class="emo-overlay" id="emojiOverlay" onclick="if(event.target===this)closeEmojiPicker()">
+  <div class="emo-box"><div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;font-weight:600">絵文字を選択</div><div class="emo-grid" id="emojiGrid"></div></div>
+</div>
+<!-- Graph Sheet -->
+<div class="graph-overlay" id="graphOverlay" onclick="if(event.target===this)closeGraph()">
+  <div class="graph-sheet">
+    <div class="sh"></div>
+    <div class="g-nav"><button class="g-nb" onclick="changeGraphMonth(-1)">‹</button><span class="g-ml" id="graphMonthLbl"></span><button class="g-nb" onclick="changeGraphMonth(1)">›</button></div>
+    <div class="g-htabs" id="graphHabitTabs"></div>
+    <div class="g-stats" id="graphStats"></div>
+    <div class="g-cal" id="graphCal"></div>
+    <div class="g-bt">週ごとの達成数</div>
+    <div id="graphBars"></div>
+  </div>
+</div>
 <script>
-/* ─────────────────────────────────────────────
-   SUPABASE
-───────────────────────────────────────────── */
-const SUPABASE_URL = 'https://rlbnancnmsxwamsecxhc.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_ZRNslRcLhzsUlaRRIO3HqA_n2zd5I7B';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-/* ─────────────────────────────────────────────
-   DATA
-───────────────────────────────────────────── */
-let tasks = [];
-let sortByDate  = false;
-let currentTab  = 'all';
-let selectedTag = '';
-let urgentOn    = false;
-let notifOn     = false;
-let isCustomTag = false;
-let notifTimers = {};
-
-/* DB行 → アプリ内オブジェクト */
-function dbToTask(row) {
-  return {
-    id:        row.id,
-    title:     row.title,
-    memo:      row.memo    || '',
-    date:      row.date    || '',
-    time:      row.time    || '',
-    notif:     !!row.notif,
-    tag:       row.tag     || '',
-    urgent:    !!row.urgent,
-    done:      !!row.done,
-    createdAt: new Date(row.created_at),
-  };
-}
-
-/* ローディング */
-function showLoading(on) {
-  document.getElementById('loadingBar').style.opacity = on ? '1' : '0';
-}
-
-function showSync(on) {
-  document.getElementById('syncIndicator').classList.toggle('show', on);
-}
-
-/* 全タスク読み込み */
-async function loadTasks() {
-  showLoading(true);
-  const { data, error } = await sb
-    .from('tasks')
-    .select('*')
-    .order('created_at', { ascending: true });
-  showLoading(false);
-  if (error) { console.error('load error:', error); return; }
-  tasks = data.map(dbToTask);
-  render();
-  scheduleAll();
-}
-
-/* ─────────────────────────────────────────────
-   PRAISE
-───────────────────────────────────────────── */
-const praises = [
-  'すごい！✨', '天才！🌟', 'さすが！🎉', 'やったね！🥳',
-  '完璧！💯', 'えらい！👏', 'かっこいい！😎', '最高！🔥',
-  '素晴らしい！🌸', 'できた！🎊', 'さすがです！⚡', 'いいね！💪',
-  'お疲れさま！☕', 'ナイス！🙌', 'やるじゃん！👍',
-];
-
-/* ─────────────────────────────────────────────
-   FORMAT HELPERS
-───────────────────────────────────────────── */
-function formatDisplayDate(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr + 'T00:00');
-  return `${d.getMonth()+1}/${d.getDate()}`;
-}
-
-function formatHeadingDate(dateStr) {
-  if (!dateStr) return '日付なし';
-  const d = new Date(dateStr + 'T00:00');
-  const days = ['日','月','火','水','木','金','土'];
-  return `${d.getMonth()+1}月${d.getDate()}日（${days[d.getDay()]}）`;
-}
-
-/* ─────────────────────────────────────────────
-   SORT / FILTER / GROUP
-───────────────────────────────────────────── */
-function toggleSort() {
-  sortByDate = !sortByDate;
-  document.getElementById('sortLabel').textContent = sortByDate ? '作成順' : '日付順';
-  document.getElementById('sortBtn').classList.toggle('active', sortByDate);
-  render();
-}
-
-function switchTab(tab, el) {
-  currentTab = tab;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  render();
-}
-
-function getFilteredTasks() {
-  let t = [...tasks];
-  if (currentTab === 'todo')   t = t.filter(x => !x.done);
-  else if (currentTab === 'done')   t = t.filter(x => x.done);
-  else if (currentTab === 'urgent') t = t.filter(x => x.urgent && !x.done);
-  if (sortByDate) {
-    t.sort((a,b) => {
-      const da = a.date || '9999', db = b.date || '9999';
-      return da.localeCompare(db) || a.createdAt - b.createdAt;
+// ── Supabase ──
+var SUPABASE_URL='https://rlbnancnmsxwamsecxhc.supabase.co';
+var SUPABASE_KEY='sb_publishable_ZRNslRcLhzsUlaRRIO3HqA_n2zd5I7B';
+var sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+var tasks=[];
+var habitDefs=[];
+var habitLogs={};
+var nextHabitId=Date.now();
+var sortByDate=false,currentTab='all',selectedTag='',urgentOn=false,notifOn=false,isCustomTag=false;
+var notifTimers={},editingId=null,pendingDeleteId=null;
+var graphMonth=new Date(),selGraphHabit=null;
+var dragSrc=null;
+// localStorage fallback (テーマのみ)
+function save(){/* Supabaseに移行済み - 互換のため残す */}
+function setTheme(n,el){document.documentElement.setAttribute('data-theme',n==='default'?'':n);document.querySelectorAll('.theme-option').forEach(function(o){o.classList.remove('active');});if(el)el.classList.add('active');localStorage.setItem('atode_theme',n);closeThemePanel();}
+function toggleThemePanel(){document.getElementById('themePanel').classList.toggle('open');}
+function closeThemePanel(){document.getElementById('themePanel').classList.remove('open');}
+(function(){var t=localStorage.getItem('atode_theme');if(t&&t!=='default'){document.documentElement.setAttribute('data-theme',t);document.querySelectorAll('.theme-option').forEach(function(o){o.classList.toggle('active',o.getAttribute('onclick').indexOf("'"+t+"'")>-1);});}})();
+function pad(n){return String(n).padStart(2,'0');}
+function todayStr(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function dateStr(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function renderHabitTable(){
+  var wrap=document.getElementById('habitTable');
+  if(!wrap)return;
+  if(!habitDefs.length){wrap.innerHTML='<div style="font-size:12px;color:var(--text-sub);padding:6px 0 10px">「編集」から習慣を追加してください</div>';return;}
+  var today=new Date();today.setHours(0,0,0,0);
+  var dow=(today.getDay()+6)%7;
+  var wkStart=new Date(today);wkStart.setDate(today.getDate()-dow);
+  var DL=['月','火','水','木','金','土','日'];
+  var dates=[];
+  for(var i=0;i<7;i++){var d=new Date(wkStart);d.setDate(wkStart.getDate()+i);dates.push(d);}
+  var html='<table class="habit-table"><thead><tr><th class="habit-lbl-cell"></th>';
+  dates.forEach(function(d,i){html+='<th>'+DL[i]+'</th>';});
+  html+='</tr><tr class="habit-date-row"><td></td>';
+  dates.forEach(function(d){var isT=dateStr(d)===todayStr();html+='<td class="'+(isT?'habit-date-today':'')+'">'+d.getDate()+'</td>';});
+  html+='</tr></thead><tbody>';
+  habitDefs.forEach(function(h){
+    var logs=habitLogs[h.id]||{};
+    html+='<tr><td class="habit-lbl-cell"><div class="habit-lbl-inner"><span class="habit-emoji">'+h.emoji+'</span><span class="habit-name-txt">'+h.name+'</span></div></td>';
+    dates.forEach(function(d){
+      var ds=dateStr(d);var isToday=ds===todayStr();var isFuture=d>today;var isChecked=!!logs[ds];
+      var cls='h-dot';if(isToday)cls+=' today-dot';if(isChecked)cls+=' checked';if(isFuture)cls+=' future';
+      var click=isFuture?'':'onclick="toggleHabit(\''+h.id+'\',\''+ds+'\')"';
+      html+='<td class="habit-dot-cell"><div class="'+cls+'" '+click+'></div></td>';
     });
-  } else {
-    t.sort((a,b) => a.createdAt - b.createdAt);
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+}
+async function toggleHabit(hid,ds){
+  if(!habitLogs[hid])habitLogs[hid]={};
+  if(habitLogs[hid][ds]){
+    delete habitLogs[hid][ds];
+    await sb.from('habit_logs').delete().eq('item_id',hid).eq('log_date',ds);
+  }else{
+    habitLogs[hid][ds]=true;
+    await sb.from('habit_logs').insert([{item_id:hid,log_date:ds}]);
   }
+  renderHabitTable();
+  if(document.getElementById('graphOverlay').classList.contains('open'))renderGraph();
+}
+function openManageSheet(){renderHabitItemList();document.getElementById('manageSheetOverlay').classList.add('open');}
+function closeManageSheet(){document.getElementById('manageSheetOverlay').classList.remove('open');}
+function renderHabitItemList(){
+  document.getElementById('habitItemList').innerHTML=habitDefs.map(function(h,i){
+    return '<div class="hi-row" draggable="true" data-idx="'+i+'" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)"><span class="hi-dh">⠿</span><span class="hi-em">'+h.emoji+'</span><span class="hi-nm">'+h.name+'</span><button class="hi-del" onclick="removeHabitItem(\''+h.id+'\')">✕</button></div>';
+  }).join('');
+}
+async function addHabitItem(){
+  var name=document.getElementById('newHabitName').value.trim();
+  var emoji=document.getElementById('emojiPickerBtn').textContent;
+  if(!name){document.getElementById('newHabitName').focus();return;}
+  var sortOrder=habitDefs.length;
+  var res=await sb.from('habit_items').insert([{emoji:emoji,name:name,sort_order:sortOrder}]).select().single();
+  if(res.error){console.error(res.error);return;}
+  var h=res.data;
+  habitDefs.push({id:h.id,emoji:h.emoji,name:h.name});
+  habitLogs[h.id]={};
+  renderHabitItemList();renderHabitTable();
+  document.getElementById('newHabitName').value='';document.getElementById('emojiPickerBtn').textContent='😊';
+}
+async function removeHabitItem(id){
+  await sb.from('habit_items').delete().eq('id',id);
+  await sb.from('habit_logs').delete().eq('item_id',id);
+  habitDefs=habitDefs.filter(function(h){return h.id!==id;});
+  delete habitLogs[id];
+  renderHabitItemList();renderHabitTable();
+}
+function dragStart(e){dragSrc=e.currentTarget;e.dataTransfer.effectAllowed='move';}
+function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';}
+async function dragDrop(e){
+  e.preventDefault();
+  var fi=parseInt(dragSrc.dataset.idx),ti=parseInt(e.currentTarget.dataset.idx);
+  if(fi===ti)return;
+  var item=habitDefs.splice(fi,1)[0];habitDefs.splice(ti,0,item);
+  renderHabitItemList();renderHabitTable();
+  // 全アイテムのsort_orderを一括更新
+  for(var i=0;i<habitDefs.length;i++){
+    await sb.from('habit_items').update({sort_order:i}).eq('id',habitDefs[i].id);
+  }
+}
+var EMOJIS=['😊','💪','🏃','📖','💧','🥗','🧘','😴','☀️','🎵','✍️','🧠','🌱','❤️','🔥','⭐','🎯','💊','🚶','🍎','☕','🧹','💰','🎨','🤸','🏋️','🧴','📝','🙏','🌸','🦷','🛁','🥤','🍵','🎮','📱','💻','🚴','🏊','🧗'];
+function openEmojiPicker(){document.getElementById('emojiGrid').innerHTML=EMOJIS.map(function(e){return '<div class="emo-cell" onclick="selectEmoji(\''+e+'\')">'+e+'</div>';}).join('');document.getElementById('emojiOverlay').classList.add('open');}
+function closeEmojiPicker(){document.getElementById('emojiOverlay').classList.remove('open');}
+function selectEmoji(em){document.getElementById('emojiPickerBtn').textContent=em;closeEmojiPicker();}
+function openGraph(){graphMonth=new Date();selGraphHabit=habitDefs[0]?habitDefs[0].id:null;renderGraphTabs();renderGraph();document.getElementById('graphOverlay').classList.add('open');}
+function closeGraph(){document.getElementById('graphOverlay').classList.remove('open');}
+function changeGraphMonth(d){graphMonth=new Date(graphMonth.getFullYear(),graphMonth.getMonth()+d,1);renderGraph();}
+function renderGraphTabs(){document.getElementById('graphHabitTabs').innerHTML=habitDefs.map(function(h){return '<div class="g-ht '+(h.id===selGraphHabit?'active':'')+'" onclick="selGH(\''+h.id+'\')">'+h.emoji+' '+h.name+'</div>';}).join('');}
+function selGH(id){selGraphHabit=id;renderGraphTabs();renderGraph();}
+function toggleGraphHabit(hid,ds){toggleHabit(hid,ds);renderGraph();}
+function renderGraph(){
+  if(!selGraphHabit&&habitDefs.length)selGraphHabit=habitDefs[0].id;
+  var logs=habitLogs[selGraphHabit]||{};
+  var y=graphMonth.getFullYear(),m=graphMonth.getMonth();
+  var MN=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  document.getElementById('graphMonthLbl').textContent=y+'年 '+MN[m];
+  var today=new Date();today.setHours(0,0,0,0);
+  var dim=new Date(y,m+1,0).getDate();
+  /* offset moved to offsetSun below */
+  var checked=0,streak=0,cur=0;
+  for(var d=1;d<=dim;d++){var ds=y+'-'+pad(m+1)+'-'+pad(d);var cd=new Date(y,m,d);cd.setHours(0,0,0,0);if(cd>today)break;if(logs[ds]){checked++;cur++;}else cur=0;}
+  if(m===today.getMonth()&&y===today.getFullYear()){for(var d2=today.getDate();d2>=1;d2--){if(logs[y+'-'+pad(m+1)+'-'+pad(d2)])streak++;else break;}}
+  var total=(m===today.getMonth()&&y===today.getFullYear())?today.getDate():dim;
+  var rate=total?Math.round(checked/total*100):0;
+  document.getElementById('graphStats').innerHTML='<div class="g-sc"><div class="g-sn">'+checked+'</div><div class="g-sl">達成日数</div></div><div class="g-sc"><div class="g-sn">'+streak+'</div><div class="g-sl">連続記録</div></div><div class="g-sc"><div class="g-sn">'+rate+'%</div><div class="g-sl">達成率</div></div>';
+  // 日曜始まり
+  var firstDowSun=new Date(y,m,1).getDay(); // Sun=0
+  var offsetSun=firstDowSun;
+  var hdrs=['日','月','火','水','木','金','土'].map(function(d){return '<div class="g-ch">'+d+'</div>';}).join('');
+  var cells=hdrs;
+  for(var i=0;i<offsetSun;i++)cells+='<div class="g-cc ec"></div>';
+  for(var d3=1;d3<=dim;d3++){
+    var ds3=y+'-'+pad(m+1)+'-'+pad(d3);
+    var cd3=new Date(y,m,d3);cd3.setHours(0,0,0,0);
+    var isFuture=cd3>today,isToday=cd3.getTime()===today.getTime();
+    var cls='g-cc';
+    if(isFuture)cls+=' fut';
+    else if(logs[ds3])cls+=' ck';
+    else if(isToday)cls+=' tc';
+    var click=isFuture?'':'onclick="toggleGraphHabit(\''+selGraphHabit+'\',\''+ds3+'\')"';
+    cells+='<div class="'+cls+'" '+click+'><span>'+d3+'</span></div>';
+  }
+  document.getElementById('graphCal').innerHTML=cells;
+  var weeks=[];
+  for(var d4=1;d4<=dim;d4++){var ds4=y+'-'+pad(m+1)+'-'+pad(d4);var cd4=new Date(y,m,d4);cd4.setHours(0,0,0,0);var wk=Math.floor((d4+offsetSun-1)/7);if(!weeks[wk])weeks[wk]={count:0,total:0};if(cd4<=today){weeks[wk].total++;if(logs[ds4])weeks[wk].count++;}}
+  document.getElementById('graphBars').innerHTML=weeks.map(function(w,i){return w&&w.total?'<div class="g-br"><div class="g-bl">W'+(i+1)+'</div><div class="g-btr"><div class="g-bf" style="width:'+Math.round(w.count/w.total*100)+'%"></div></div><div class="g-bc">'+w.count+'/'+w.total+'</div></div>':'';}).join('');
+}
+var praises=['すごい！✨','天才！🌟','さすが！🎉','やったね！🥳','完璧！💯','えらい！👏','最高！🔥','素晴らしい！🌸','できた！🎊','ナイス！🙌','やるじゃん！👍'];
+function fmtDate(s){if(!s)return null;var d=new Date(s+'T00:00');return (d.getMonth()+1)+'/'+d.getDate();}
+function fmtHead(s){if(!s)return '日付なし';var d=new Date(s+'T00:00');var D=['日','月','火','水','木','金','土'];return (d.getMonth()+1)+'月'+d.getDate()+'日（'+D[d.getDay()]+'）';}
+function toggleSort(){sortByDate=!sortByDate;document.getElementById('sortLabel').textContent=sortByDate?'作成順':'日付順';document.getElementById('sortBtn').classList.toggle('active',sortByDate);render();}
+function switchTab(tab,el){currentTab=tab;document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});el.classList.add('active');render();}
+function getFiltered(){
+  var t=tasks.slice();
+  if(currentTab==='todo')t=t.filter(function(x){return!x.done;});
+  else if(currentTab==='done')t=t.filter(function(x){return x.done;});
+  else if(currentTab==='urgent')t=t.filter(function(x){return x.urgent&&!x.done;});
+  if(sortByDate)t.sort(function(a,b){var da=a.date||'9999',db=b.date||'9999';return da<db?-1:da>db?1:a.createdAt-b.createdAt;});
+  else t.sort(function(a,b){return a.createdAt-b.createdAt;});
   return t;
 }
-
-function groupTasks(filtered) {
-  const groups = {};
-  filtered.forEach(t => {
-    const key = sortByDate
-      ? (t.date || '__nodate__')
-      : (() => { const d = t.createdAt; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(t);
+function groupTasks(ts){
+  var g={};
+  ts.forEach(function(t){
+    var k;if(sortByDate){k=t.date||'__nodate__';}else{var d=new Date(t.createdAt);k=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+    if(!g[k])g[k]=[];g[k].push(t);
   });
-  return groups;
+  return g;
 }
-
-/* ─────────────────────────────────────────────
-   RENDER
-───────────────────────────────────────────── */
-function render() {
-  const list = document.getElementById('taskList');
-  const filtered = getFilteredTasks();
-  document.getElementById('taskCountBadge').textContent = tasks.filter(t => !t.done).length;
-
-  if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty"><div class="empty-icon">✓</div>タスクがありません</div>`;
-    return;
-  }
-
-  const groups = groupTasks(filtered);
-  let html = '';
-
-  Object.keys(groups).forEach(key => {
-    const heading = sortByDate
-      ? (key === '__nodate__' ? '日付なし' : formatHeadingDate(key))
-      : formatHeadingDate(key);
-    html += `<div class="date-heading">${heading}</div>`;
-
-    groups[key].forEach(task => {
-      const displayDate = formatDisplayDate(task.date);
-      const tagHtml    = task.tag  ? `<div class="task-tags"><span class="tag">${task.tag}</span></div>` : '';
-      const memoHtml   = task.memo ? `<div class="task-memo">${task.memo}</div>` : '';
-      const urgentMark = task.urgent ? `<div class="urgent-mark">！</div>` : '';
-      const urgentClass = task.urgent ? ' urgent' : '';
-      const doneClass   = task.done   ? ' done'   : '';
-
-      let metaHtml = '';
-      if (task.time && !task.done) {
-        const notifIcon  = task.notif ? '🔔' : '🔕';
-        const notifClass = task.notif ? 'on' : '';
-        metaHtml = `
-          <div class="task-meta">
-            <span class="task-time-chip">🕐 ${task.time}</span>
-            <span class="task-notif-icon ${notifClass}" onclick="toggleTaskNotif(${task.id}, event)" title="通知 ON/OFF">${notifIcon}</span>
-          </div>`;
-      } else if (task.time && task.done) {
-        metaHtml = `<div class="task-meta"><span class="task-time-chip">🕐 ${task.time}</span></div>`;
-      }
-
-      html += `
-        <div class="task-card${urgentClass}${doneClass}" id="card-${task.id}">
-          <div class="checkbox-wrap">
-            <div class="checkbox${task.done ? ' checked' : ''}" id="cb-${task.id}" onclick="toggleTask(${task.id}, event)">
-              <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
-                <path d="M1 5L4.5 8.5L11 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <div class="sparkle-container" id="sparkles-${task.id}"></div>
-          </div>
-          ${urgentMark}
-          <div class="task-content">
-            <div class="task-header">
-              <div class="task-title">${task.title}</div>
-              ${displayDate ? `<div class="task-date-badge">${displayDate}</div>` : ''}
-            </div>
-            ${metaHtml}
-            ${memoHtml}
-            ${tagHtml}
-          </div>
-        </div>
-      `;
+function render(){
+  var list=document.getElementById('taskList');
+  var filtered=getFiltered();
+  document.getElementById('taskCountBadge').textContent=tasks.filter(function(t){return!t.done;}).length;
+  if(!filtered.length){list.innerHTML='<div class="empty"><div class="empty-icon">✓</div>タスクがありません</div>';return;}
+  var groups=groupTasks(filtered);
+  var html='';
+  Object.keys(groups).forEach(function(key){
+    html+='<div class="date-heading">'+(sortByDate?(key==='__nodate__'?'日付なし':fmtHead(key)):fmtHead(key))+'</div>';
+    groups[key].forEach(function(task){
+      var dd=fmtDate(task.date);
+      var tagH=task.tag?'<div class="task-tags"><span class="tag">'+task.tag+'</span></div>':'';
+      var memoH=task.memo?'<div class="task-memo">'+task.memo+'</div>':'';
+      var uM=task.urgent?'<div class="urgent-mark">！</div>':'';
+      var metaH='';
+      if(task.time&&!task.done)metaH='<div class="task-meta"><span class="time-chip">🕐 '+task.time+'</span><span class="notif-icon '+(task.notif?'on':'')+'" onclick="toggleTaskNotif('+task.id+',event)">'+(task.notif?'🔔':'🔕')+'</span></div>';
+      else if(task.time&&task.done)metaH='<div class="task-meta"><span class="time-chip">🕐 '+task.time+'</span></div>';
+      html+='\n<div class="task-card'+(task.urgent?' urgent':'')+(task.done?' done':'')+'" id="card-'+task.id+'" onclick="openEditModal('+task.id+')">'+
+        '<div class="cb-wrap"><div class="cb'+(task.done?' checked':'')+'" id="cb-'+task.id+'" onclick="toggleTask('+task.id+',event)">'+
+        '<svg width="11" height="9" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+        '<div class="sp-container" id="sp-'+task.id+'"></div></div>'+
+        uM+'<div class="task-content"><div class="task-header"><div class="task-title">'+task.title+'</div>'+(dd?'<div class="task-date">'+dd+'</div>':'')+'</div>'+metaH+memoH+tagH+'</div>'+
+        '<button class="card-del-btn" onclick="askDelete('+task.id+',event)">🗑</button></div>';
     });
   });
-
-  list.innerHTML = html;
+  list.innerHTML=html;
 }
-
-/* ─────────────────────────────────────────────
-   TOGGLE TASK COMPLETION
-───────────────────────────────────────────── */
-async function toggleTask(id, e) {
+function toggleTask(id,e){
   e.stopPropagation();
-  const task = tasks.find(t => t.id === id);
-  if (!task) return;
-  task.done = !task.done;
-
-  if (task.done) {
-    // Sparkles
-    const container = document.getElementById(`sparkles-${id}`);
-    spawnSparkles(container);
-
-    // Praise bubble
-    const cbWrap = document.getElementById(`cb-${id}`)?.parentElement;
-    if (cbWrap) {
-      const bubble = document.createElement('div');
-      bubble.className = 'praise-bubble';
-      bubble.textContent = praises[Math.floor(Math.random() * praises.length)];
-      cbWrap.appendChild(bubble);
-      setTimeout(() => bubble.remove(), 1700);
-    }
-
-    // Visual update immediately (楽観的更新)
-    const card = document.getElementById(`card-${id}`);
-    const cb   = document.getElementById(`cb-${id}`);
-    card?.classList.add('done');
-    card?.classList.remove('urgent');
-    if (cb) { cb.classList.add('checked'); cb.querySelector('svg').style.display = 'block'; }
-    const titleEl = card?.querySelector('.task-title');
-    if (titleEl) titleEl.style.textDecoration = 'line-through';
-
-    if (notifTimers[id]) { clearTimeout(notifTimers[id]); delete notifTimers[id]; }
-    setTimeout(() => render(), 1100);
-  } else {
-    render();
-    scheduleNotif(task);
-  }
-
-  // Supabaseに保存
-  showSync(true);
-  const { error } = await sb.from('tasks').update({ done: task.done }).eq('id', id);
-  showSync(false);
-  if (error) console.error('update error:', error);
+  var task=tasks.find(function(t){return t.id===id;});if(!task)return;
+  task.done=!task.done;
+  if(task.done){
+    spawnSparkles(document.getElementById('sp-'+id));
+    var cbWrap=document.getElementById('cb-'+id);
+    if(cbWrap&&cbWrap.parentElement){var b=document.createElement('div');b.className='praise';b.textContent=praises[Math.floor(Math.random()*praises.length)];cbWrap.parentElement.appendChild(b);setTimeout(function(){b.remove();},1700);}
+    var card=document.getElementById('card-'+id),cb=document.getElementById('cb-'+id);
+    if(card){card.classList.add('done');card.classList.remove('urgent');}
+    if(cb){cb.classList.add('checked');cb.querySelector('svg').style.display='block';}
+    var te=card&&card.querySelector('.task-title');if(te)te.style.textDecoration='line-through';
+    if(notifTimers[id]){clearTimeout(notifTimers[id]);delete notifTimers[id];}
+    setTimeout(function(){render();},1100);
+  }else{render();scheduleNotif(task);}
+  sb.from('tasks').update({done:task.done}).eq('id',id);
 }
-
-/* ─────────────────────────────────────────────
-   TOGGLE NOTIF ON CARD
-───────────────────────────────────────────── */
-async function toggleTaskNotif(id, e) {
+function toggleTaskNotif(id,e){
   e.stopPropagation();
-  const task = tasks.find(t => t.id === id);
-  if (!task) return;
-  task.notif = !task.notif;
-
-  if (task.notif) {
-    requestNotifPermission(() => scheduleNotif(task));
-  } else {
-    if (notifTimers[id]) { clearTimeout(notifTimers[id]); delete notifTimers[id]; }
-  }
-
-  showSync(true);
-  await sb.from('tasks').update({ notif: task.notif }).eq('id', id);
-  showSync(false);
+  var task=tasks.find(function(t){return t.id===id;});if(!task)return;
+  task.notif=!task.notif;
+  if(task.notif)requestNotifPermission(function(){scheduleNotif(task);});
+  else if(notifTimers[id]){clearTimeout(notifTimers[id]);delete notifTimers[id];}
+  sb.from('tasks').update({notif:task.notif}).eq('id',id);
   render();
 }
-
-/* ─────────────────────────────────────────────
-   SPARKLES
-───────────────────────────────────────────── */
-function spawnSparkles(container) {
-  const palette = [
-    '#e8673a','#f5a07a','#fde8df','#e85c20',
-    '#c4a882','#8b6347','#5c3d2e',
-    '#f5c842','#f7e060','#ffe0a0',
-    '#e8c4f0','#c47ae8','#a040d0',
-    '#7ae8d4','#40c8a8','#20a888',
-    '#ffffff','#ffe8e0',
-  ];
-  const shapes = ['','','','star','star','diamond'];
-  const count = 22;
-  container.innerHTML = '';
-  for (let i = 0; i < count; i++) {
-    const s = document.createElement('div');
-    const shape = shapes[Math.floor(Math.random() * shapes.length)];
-    s.className = `sparkle${shape ? ' '+shape : ''}`;
-    const angle = (i / count) * 360 + (Math.random() * 25 - 12);
-    const dist  = 18 + Math.random() * 26;
-    const tx    = Math.cos(angle * Math.PI / 180) * dist;
-    const ty    = Math.sin(angle * Math.PI / 180) * dist;
-    const rot   = Math.random() * 720 - 360;
-    s.style.setProperty('--tx', tx + 'px');
-    s.style.setProperty('--ty', ty + 'px');
-    s.style.setProperty('--rot', rot + 'deg');
-    s.style.background = palette[Math.floor(Math.random() * palette.length)];
-    const size = shape ? (5 + Math.random() * 7) : (3 + Math.random() * 5);
-    s.style.width  = size + 'px';
-    s.style.height = size + 'px';
-    s.style.left   = (-size/2) + 'px';
-    s.style.top    = (-size/2) + 'px';
+function askDelete(id,e){if(e)e.stopPropagation();var task=tasks.find(function(t){return t.id===id;});if(!task)return;pendingDeleteId=id;document.getElementById('confirmSub').textContent='「'+task.title+'」を削除します';document.getElementById('confirmOverlay').classList.add('open');}
+function closeConfirm(){document.getElementById('confirmOverlay').classList.remove('open');pendingDeleteId=null;}
+function confirmDelete(){if(!pendingDeleteId)return;tasks=tasks.filter(function(t){return t.id!==pendingDeleteId;});if(notifTimers[pendingDeleteId]){clearTimeout(notifTimers[pendingDeleteId]);delete notifTimers[pendingDeleteId];}closeConfirm();closeModal();save();render();}
+function deleteFromModal(){if(editingId)askDelete(editingId,null);}
+function spawnSparkles(container){
+  if(!container)return;
+  var P=['#e8673a','#f5a07a','#111','#444','#f5c842','#7ae8d4','#fff'];
+  var S=['','','star'];container.innerHTML='';
+  for(var i=0;i<16;i++){
+    var s=document.createElement('div');var sh=S[Math.floor(Math.random()*S.length)];
+    s.className='sp'+(sh?' '+sh:'');
+    var a=(i/16)*360+(Math.random()*20-10),dist=14+Math.random()*20;
+    s.style.setProperty('--tx',Math.cos(a*Math.PI/180)*dist+'px');
+    s.style.setProperty('--ty',Math.sin(a*Math.PI/180)*dist+'px');
+    s.style.setProperty('--rot',(Math.random()*720-360)+'deg');
+    s.style.background=P[Math.floor(Math.random()*P.length)];
+    var sz=3+Math.random()*4;s.style.width=sz+'px';s.style.height=sz+'px';s.style.left=(-sz/2)+'px';s.style.top=(-sz/2)+'px';
     container.appendChild(s);
-    setTimeout(() => s.classList.add('active'), i * 20 + Math.random() * 40);
+    (function(el,delay){setTimeout(function(){el.classList.add('active');},delay);})(s,i*16+Math.random()*25);
   }
 }
-
-/* ─────────────────────────────────────────────
-   NOTIFICATION
-───────────────────────────────────────────── */
-function requestNotifPermission(cb) {
-  if (!('Notification' in window)) { cb && cb(); return; }
-  if (Notification.permission === 'granted') { cb && cb(); return; }
-  Notification.requestPermission().then(p => { if (p === 'granted') cb && cb(); });
-}
-
-function scheduleNotif(task) {
-  if (!task.date || !task.time || !task.notif || task.done) return;
-  const target = new Date(`${task.date}T${task.time}:00`);
-  const diff   = target - new Date();
-  if (diff <= 0) return;
-  if (notifTimers[task.id]) clearTimeout(notifTimers[task.id]);
-  notifTimers[task.id] = setTimeout(() => fireNotif(task), diff);
-}
-
-function fireNotif(task) {
-  showBanner(`⏰ ${task.title}`, task.time + ' の予定時刻です');
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification('あとで ⏰', {
-      body: task.title + '\n' + task.time + ' の予定時刻です',
-      icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏰</text></svg>',
-    });
-  }
-}
-
-function showBanner(text, sub) {
-  const banner = document.getElementById('notifBanner');
-  document.getElementById('notifBannerText').textContent = text;
-  document.getElementById('notifBannerSub').textContent  = sub;
-  banner.classList.add('show');
-  setTimeout(() => banner.classList.remove('show'), 4500);
-}
-
-function scheduleAll() {
-  requestNotifPermission(() => tasks.forEach(t => scheduleNotif(t)));
-}
-
-/* ─────────────────────────────────────────────
-   MODAL
-───────────────────────────────────────────── */
-function openModal() {
-  document.getElementById('modalOverlay').classList.add('open');
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('inputDate').value = today;
-  document.getElementById('inputTime').value = '';
-  urgentOn = false; notifOn = false;
+function requestNotifPermission(cb){if(!('Notification'in window)){if(cb)cb();return;}if(Notification.permission==='granted'){if(cb)cb();return;}Notification.requestPermission().then(function(p){if(p==='granted'&&cb)cb();});}
+function scheduleNotif(task){if(!task.date||!task.time||!task.notif||task.done)return;var diff=new Date(task.date+'T'+task.time+':00')-new Date();if(diff<=0)return;if(notifTimers[task.id])clearTimeout(notifTimers[task.id]);notifTimers[task.id]=setTimeout(function(){fireNotif(task);},diff);}
+function fireNotif(task){showBanner('⏰ '+task.title,task.time+' の予定時刻です');if('Notification'in window&&Notification.permission==='granted')new Notification('あとで ⏰',{body:task.title+'\n'+task.time+' の予定時刻です'});}
+function showBanner(text,sub){var b=document.getElementById('notifBanner');document.getElementById('notifBannerText').textContent=text;document.getElementById('notifBannerSub').textContent=sub;b.classList.add('show');setTimeout(function(){b.classList.remove('show');},4500);}
+function scheduleAll(){requestNotifPermission(function(){tasks.forEach(function(t){scheduleNotif(t);});});}
+function resetForm(){
+  ['inputTitle','inputMemo','inputDate','inputTime','customTagInput'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('inputMemo').style.height='64px';;
+  document.getElementById('customTagInput').classList.remove('visible');
+  document.querySelectorAll('.tag-option').forEach(function(t){t.classList.remove('selected');});
+  selectedTag='';isCustomTag=false;urgentOn=false;notifOn=false;
   document.getElementById('urgentToggle').classList.remove('on');
-  document.getElementById('urgentLabel').textContent = 'オフ';
+  document.getElementById('urgentLabel').textContent='オフ';
   document.getElementById('notifToggleRow').classList.remove('on');
-  document.getElementById('notifLabel').textContent = '通知オフ';
+  document.getElementById('notifLabel').textContent='通知オフ';
   document.getElementById('notifHint').classList.add('visible');
-  setTimeout(() => document.getElementById('inputTitle').focus(), 100);
 }
-
-function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
-  ['inputTitle','inputMemo','inputDate','inputTime','customTagInput'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  document.getElementById('customTagInput').classList.remove('visible');
-  document.querySelectorAll('.tag-option').forEach(t => t.classList.remove('selected'));
-  selectedTag = ''; isCustomTag = false;
+function openAddModal(){
+  editingId=null;resetForm();
+  document.getElementById('modalTitle').textContent='新しいタスク';
+  document.getElementById('submitBtn').textContent='追加する';
+  document.getElementById('deleteInModalBtn').style.display='none';
+  document.getElementById('inputDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(function(){document.getElementById('inputTitle').focus();},120);
 }
-
-function handleOverlayClick(e) {
-  if (e.target === e.currentTarget) closeModal();
+function openEditModal(id){
+  var task=tasks.find(function(t){return t.id===id;});if(!task)return;
+  editingId=id;resetForm();
+  document.getElementById('modalTitle').textContent='タスクを編集';
+  document.getElementById('submitBtn').textContent='保存する';
+  document.getElementById('deleteInModalBtn').style.display='block';
+  document.getElementById('inputTitle').value=task.title;
+  document.getElementById('inputMemo').value=task.memo||'';
+  setTimeout(autoResizeMemo,0);
+  document.getElementById('inputDate').value=task.date||'';
+  document.getElementById('inputTime').value=task.time||'';
+  var tagEls=Array.from(document.querySelectorAll('.tag-option:not(.add-tag)'));
+  var matched=tagEls.find(function(el){return el.textContent===task.tag;});
+  if(matched){matched.classList.add('selected');selectedTag=task.tag;}
+  else if(task.tag){isCustomTag=true;selectedTag=task.tag;var ci=document.getElementById('customTagInput');ci.value=task.tag;ci.classList.add('visible');}
+  urgentOn=task.urgent;if(urgentOn){document.getElementById('urgentToggle').classList.add('on');document.getElementById('urgentLabel').textContent='！対応マスト';}
+  notifOn=task.notif&&!!task.time;if(notifOn){document.getElementById('notifToggleRow').classList.add('on');document.getElementById('notifLabel').textContent='🔔 通知オン';}
+  document.getElementById('notifHint').classList.toggle('visible',!task.time);
+  document.getElementById('modalOverlay').classList.add('open');
 }
-
-function toggleUrgent() {
-  urgentOn = !urgentOn;
-  document.getElementById('urgentToggle').classList.toggle('on', urgentOn);
-  document.getElementById('urgentLabel').textContent = urgentOn ? '！対応マスト' : 'オフ';
-}
-
-function toggleNotif() {
-  const timeVal = document.getElementById('inputTime').value;
-  if (!timeVal) {
-    document.getElementById('notifHint').classList.add('visible');
-    return;
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');editingId=null;}
+function handleOverlayClick(e){if(e.target===e.currentTarget)closeModal();}
+function toggleUrgent(){urgentOn=!urgentOn;document.getElementById('urgentToggle').classList.toggle('on',urgentOn);document.getElementById('urgentLabel').textContent=urgentOn?'！対応マスト':'オフ';}
+function toggleNotif(){if(!document.getElementById('inputTime').value){document.getElementById('notifHint').classList.add('visible');return;}notifOn=!notifOn;document.getElementById('notifToggleRow').classList.toggle('on',notifOn);document.getElementById('notifLabel').textContent=notifOn?'🔔 通知オン':'通知オフ';if(notifOn)requestNotifPermission(null);}
+document.getElementById('inputTime').addEventListener('input',function(){var v=document.getElementById('inputTime').value;document.getElementById('notifHint').classList.toggle('visible',!v);if(!v){notifOn=false;document.getElementById('notifToggleRow').classList.remove('on');document.getElementById('notifLabel').textContent='通知オフ';}});
+function autoResizeMemo(){var el=document.getElementById('inputMemo');el.style.height='64px';el.style.height=Math.max(64,el.scrollHeight)+'px';}
+document.getElementById('inputMemo').addEventListener('input',autoResizeMemo);
+function selectTag(el,name){var already=el.classList.contains('selected');document.querySelectorAll('.tag-option:not(.add-tag)').forEach(function(t){t.classList.remove('selected');});if(!already){el.classList.add('selected');selectedTag=name;}else selectedTag='';document.getElementById('customTagInput').classList.remove('visible');isCustomTag=false;}
+function showCustomTag(){document.querySelectorAll('.tag-option:not(.add-tag)').forEach(function(t){t.classList.remove('selected');});selectedTag='';isCustomTag=true;var i=document.getElementById('customTagInput');i.classList.add('visible');i.focus();}
+async function submitModal(){
+  var title=document.getElementById('inputTitle').value.trim();
+  if(!title){var inp=document.getElementById('inputTitle');inp.style.borderColor='var(--accent)';inp.focus();setTimeout(function(){inp.style.borderColor='';},1400);return;}
+  var memo=document.getElementById('inputMemo').value.trim();
+  var date=document.getElementById('inputDate').value;
+  var time=document.getElementById('inputTime').value;
+  var tag=isCustomTag?document.getElementById('customTagInput').value.trim():selectedTag;
+  var notif=notifOn&&!!time;
+  closeModal();showSync(true);
+  if(editingId){
+    var res=await sb.from('tasks').update({title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn}).eq('id',editingId).select().single();
+    showSync(false);
+    if(!res.error){var task=tasks.find(function(t){return t.id===editingId;});if(task){Object.assign(task,{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn});scheduleNotif(task);}}
+  }else{
+    var res=await sb.from('tasks').insert([{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false}]).select().single();
+    showSync(false);
+    if(!res.error){var nt={id:res.data.id,title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false,createdAt:new Date(res.data.created_at)};tasks.push(nt);if(notif)requestNotifPermission(function(){scheduleNotif(nt);});}
   }
-  notifOn = !notifOn;
-  document.getElementById('notifToggleRow').classList.toggle('on', notifOn);
-  document.getElementById('notifLabel').textContent = notifOn ? '🔔 通知オン' : '通知オフ';
-  if (notifOn) requestNotifPermission(null);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('inputTime').addEventListener('input', () => {
-    const v = document.getElementById('inputTime').value;
-    document.getElementById('notifHint').classList.toggle('visible', !v);
-    if (!v) {
-      notifOn = false;
-      document.getElementById('notifToggleRow').classList.remove('on');
-      document.getElementById('notifLabel').textContent = '通知オフ';
-    }
-  });
-});
-
-function selectTag(el, tagName) {
-  const already = el.classList.contains('selected');
-  document.querySelectorAll('.tag-option:not(.add-tag)').forEach(t => t.classList.remove('selected'));
-  if (!already) { el.classList.add('selected'); selectedTag = tagName; }
-  else selectedTag = '';
-  document.getElementById('customTagInput').classList.remove('visible');
-  isCustomTag = false;
-}
-
-function showCustomTag() {
-  document.querySelectorAll('.tag-option:not(.add-tag)').forEach(t => t.classList.remove('selected'));
-  selectedTag = ''; isCustomTag = true;
-  const input = document.getElementById('customTagInput');
-  input.classList.add('visible');
-  input.focus();
-}
-
-/* ─────────────────────────────────────────────
-   ADD TASK (Supabase)
-───────────────────────────────────────────── */
-async function addTask() {
-  const title = document.getElementById('inputTitle').value.trim();
-  if (!title) {
-    const inp = document.getElementById('inputTitle');
-    inp.style.borderColor = 'var(--orange)';
-    inp.focus();
-    setTimeout(() => inp.style.borderColor = '', 1500);
-    return;
-  }
-  const memo  = document.getElementById('inputMemo').value.trim();
-  const date  = document.getElementById('inputDate').value;
-  const time  = document.getElementById('inputTime').value;
-  const tag   = isCustomTag ? document.getElementById('customTagInput').value.trim() : selectedTag;
-  const notif = notifOn && !!time;
-
-  closeModal();
-  showSync(true);
-
-  const { data, error } = await sb.from('tasks').insert([{
-    title, memo, date, time, notif, tag,
-    urgent: urgentOn,
-    done: false,
-  }]).select().single();
-
-  showSync(false);
-
-  if (error) {
-    console.error('insert error:', error);
-    alert('保存に失敗しました。接続を確認してください。');
-    return;
-  }
-
-  const task = dbToTask(data);
-  tasks.push(task);
-  if (notif) requestNotifPermission(() => scheduleNotif(task));
   render();
 }
-
-/* ─────────────────────────────────────────────
-   REALTIME SYNC (他の端末の変更を自動反映)
-───────────────────────────────────────────── */
-sb.channel('tasks-realtime')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
-    if (payload.eventType === 'INSERT') {
-      const newTask = dbToTask(payload.new);
-      if (!tasks.find(t => t.id === newTask.id)) {
-        tasks.push(newTask);
-        scheduleNotif(newTask);
-        render();
-      }
-    } else if (payload.eventType === 'UPDATE') {
-      const idx = tasks.findIndex(t => t.id === payload.new.id);
-      if (idx !== -1) {
-        tasks[idx] = dbToTask(payload.new);
-        render();
-      }
-    } else if (payload.eventType === 'DELETE') {
-      tasks = tasks.filter(t => t.id !== payload.old.id);
-      render();
-    }
-  })
-  .subscribe();
-
-/* ─────────────────────────────────────────────
-   KEYBOARD
-───────────────────────────────────────────── */
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openModal(); }
-});
-
-/* ─────────────────────────────────────────────
-   INIT
-───────────────────────────────────────────── */
-loadTasks();
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeModal();closeConfirm();closeThemePanel();closeManageSheet();closeGraph();closeEmojiPicker();}if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();openAddModal();}});
+document.addEventListener('click',function(e){var p=document.getElementById('themePanel');if(p.classList.contains('open')&&!p.contains(e.target)&&!e.target.closest('.theme-btn'))closeThemePanel();});
+// ── 同期インジケーター ──
+function showSync(on){
+  var el=document.getElementById('syncIndicator');
+  if(!el){el=document.createElement('div');el.id='syncIndicator';el.style.cssText='position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:12px;padding:5px 14px;border-radius:20px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;';document.body.appendChild(el);}
+  el.textContent='同期中…';el.style.opacity=on?'1':'0';
+}
+// ── 初期ロード ──
+async function init(){
+  showSync(true);
+  // tasks
+  var tr=await sb.from('tasks').select('*').order('created_at',{ascending:true});
+  if(!tr.error&&tr.data){
+    tasks=tr.data.map(function(r){return{id:r.id,title:r.title,memo:r.memo||'',date:r.date||'',time:r.time||'',notif:!!r.notif,tag:r.tag||'',urgent:!!r.urgent,done:!!r.done,createdAt:new Date(r.created_at)};});
+  }
+  // habit_items
+  var hr=await sb.from('habit_items').select('*').order('sort_order',{ascending:true});
+  if(!hr.error&&hr.data&&hr.data.length){
+    habitDefs=hr.data.map(function(r){return{id:r.id,emoji:r.emoji,name:r.name};});
+  }else if(!hr.error&&hr.data&&hr.data.length===0){
+    // デフォルト項目を挿入
+    var defaults=[{emoji:'💪',name:'運動',sort_order:0},{emoji:'📖',name:'読書',sort_order:1},{emoji:'💧',name:'水',sort_order:2}];
+    var dr=await sb.from('habit_items').insert(defaults).select();
+    if(!dr.error)habitDefs=dr.data.map(function(r){return{id:r.id,emoji:r.emoji,name:r.name};});
+  }
+  selGraphHabit=habitDefs[0]?habitDefs[0].id:null;
+  // habit_logs
+  var lr=await sb.from('habit_logs').select('item_id,log_date');
+  if(!lr.error&&lr.data){
+    habitLogs={};
+    lr.data.forEach(function(r){if(!habitLogs[r.item_id])habitLogs[r.item_id]={};habitLogs[r.item_id][r.log_date]=true;});
+  }
+  showSync(false);
+  render();
+  renderHabitTable();
+  scheduleAll();
+}
+init();
 </script>
 </body>
 </html>
