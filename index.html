@@ -206,6 +206,18 @@
   .g-btr{flex:1;height:7px;background:var(--bg2);border-radius:4px;overflow:hidden;}
   .g-bf{height:100%;background:var(--accent);border-radius:4px;transition:width .5s cubic-bezier(.34,1.2,.64,1);}
   .g-bc{font-size:10px;color:var(--text-sub);width:24px;text-align:right;}
+
+  /* 月間サマリー（カレンダー上） */
+  .g-summary{display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-radius:12px;padding:8px 14px;margin-bottom:10px;}
+  .g-sum-label{font-size:11px;color:var(--text-sub);}
+  .g-sum-val{font-size:13px;font-weight:700;color:var(--accent);}
+  /* 繰り返し設定 */
+  .repeat-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .repeat-btn{padding:5px 12px;border-radius:20px;font-size:12px;border:1.5px solid var(--border);background:var(--bg);color:var(--text-sub);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;user-select:none;}
+  .repeat-btn.selected{background:var(--ap);border-color:var(--al);color:var(--accent);font-weight:600;}
+  .repeat-info{font-size:11px;color:var(--text-sub);margin-top:5px;line-height:1.5;}
+  /* 繰り返しタスクバッジ */
+  .repeat-badge{font-size:10px;background:var(--bg2);color:var(--text-sub);border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -262,13 +274,23 @@
       <div class="form-group"><div class="form-label">時間</div><input class="form-input" id="inputTime" type="time"></div>
     </div>
     <div class="form-group">
-      <div class="form-label">⏰ 通知</div>
+      <div class="form-label">通知</div>
       <div class="notif-row" id="notifToggleRow" onclick="toggleNotif()"><span class="notif-row-label" id="notifLabel">通知オフ</span><div class="tsw"></div></div>
       <div class="notif-hint" id="notifHint">※ 時間を入力すると設定できます</div>
     </div>
     <div class="form-row">
       <div class="form-group"><div class="form-label">対応マスト</div><div class="urgent-toggle" id="urgentToggle" onclick="toggleUrgent()"><span class="utl" id="urgentLabel">オフ</span><div class="tsw"></div></div></div>
       <div class="form-group" style="visibility:hidden"></div>
+    </div>
+    <div class="form-group">
+      <div class="form-label">繰り返し</div>
+      <div class="repeat-row">
+        <div class="repeat-btn" onclick="selectRepeat(this,'none')">なし</div>
+        <div class="repeat-btn" onclick="selectRepeat(this,'daily')">毎日</div>
+        <div class="repeat-btn" onclick="selectRepeat(this,'weekly')">毎週</div>
+        <div class="repeat-btn" onclick="selectRepeat(this,'monthly')">毎月</div>
+      </div>
+      <div class="repeat-info" id="repeatInfo"></div>
     </div>
     <div class="form-group">
       <div class="form-label">タグ</div>
@@ -297,7 +319,7 @@
     <div class="sheet-header"><span class="sheet-title">習慣の編集</span><button class="sheet-close" onclick="closeManageSheet()">✕</button></div>
     <div id="habitItemList"></div>
     <div class="add-hr">
-      <button class="form-input add-em-btn" id="emojiPickerBtn" onclick="openEmojiPicker()">😊</button>
+      <button class="form-input add-em-btn" id="emojiPickerBtn" style="display:none">😊</button>
       <input class="form-input add-nm-inp" id="newHabitName" placeholder="習慣名（例: 運動）" type="text" onkeydown="if(event.key==='Enter')addHabitItem()">
       <button class="add-btn-s" onclick="addHabitItem()">追加</button>
     </div>
@@ -313,9 +335,9 @@
     <div class="sh"></div>
     <div class="g-nav"><button class="g-nb" onclick="changeGraphMonth(-1)">‹</button><span class="g-ml" id="graphMonthLbl"></span><button class="g-nb" onclick="changeGraphMonth(1)">›</button></div>
     <div class="g-htabs" id="graphHabitTabs"></div>
-    <div class="g-stats" id="graphStats"></div>
+    <div class="g-summary" id="graphSummary"></div>
     <div class="g-cal" id="graphCal"></div>
-    <div class="g-bt">週ごとの達成数</div>
+    <div class="g-bt">週ごとの達成</div>
     <div id="graphBars"></div>
   </div>
 </div>
@@ -328,7 +350,7 @@ var tasks=[];
 var habitDefs=[];
 var habitLogs={};
 var nextHabitId=Date.now();
-var sortByDate=false,currentTab='all',selectedTag='',urgentOn=false,notifOn=false,isCustomTag=false;
+var sortByDate=false,currentTab='all',selectedTag='',urgentOn=false,notifOn=false,isCustomTag=false,repeatMode='none';
 var notifTimers={},editingId=null,pendingDeleteId=null;
 var graphMonth=new Date(),selGraphHabit=null;
 var dragSrc=null;
@@ -358,7 +380,7 @@ function renderHabitTable(){
   html+='</tr></thead><tbody>';
   habitDefs.forEach(function(h){
     var logs=habitLogs[h.id]||{};
-    html+='<tr><td class="habit-lbl-cell"><div class="habit-lbl-inner"><span class="habit-emoji">'+h.emoji+'</span><span class="habit-name-txt">'+h.name+'</span></div></td>';
+    html+='<tr><td class="habit-lbl-cell"><div class="habit-lbl-inner"><span class="habit-name-txt">'+h.name+'</span></div></td>';
     dates.forEach(function(d){
       var ds=dateStr(d);var isToday=ds===todayStr();var isFuture=d>today;var isChecked=!!logs[ds];
       var cls='h-dot';if(isToday)cls+=' today-dot';if(isChecked)cls+=' checked';if(isFuture)cls+=' future';
@@ -386,12 +408,12 @@ function openManageSheet(){renderHabitItemList();document.getElementById('manage
 function closeManageSheet(){document.getElementById('manageSheetOverlay').classList.remove('open');}
 function renderHabitItemList(){
   document.getElementById('habitItemList').innerHTML=habitDefs.map(function(h,i){
-    return '<div class="hi-row" draggable="true" data-idx="'+i+'" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)"><span class="hi-dh">⠿</span><span class="hi-em">'+h.emoji+'</span><span class="hi-nm">'+h.name+'</span><button class="hi-del" onclick="removeHabitItem(\''+h.id+'\')">✕</button></div>';
+    return '<div class="hi-row" draggable="true" data-idx="'+i+'" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)"><span class="hi-dh">⠿</span><span class="hi-nm">'+h.name+'</span><button class="hi-del" onclick="removeHabitItem(\''+h.id+'\')">✕</button></div>';
   }).join('');
 }
 async function addHabitItem(){
   var name=document.getElementById('newHabitName').value.trim();
-  var emoji=document.getElementById('emojiPickerBtn').textContent;
+  var emoji='';
   if(!name){document.getElementById('newHabitName').focus();return;}
   var sortOrder=habitDefs.length;
   var res=await sb.from('habit_items').insert([{emoji:emoji,name:name,sort_order:sortOrder}]).select().single();
@@ -429,7 +451,7 @@ function selectEmoji(em){document.getElementById('emojiPickerBtn').textContent=e
 function openGraph(){graphMonth=new Date();selGraphHabit=habitDefs[0]?habitDefs[0].id:null;renderGraphTabs();renderGraph();document.getElementById('graphOverlay').classList.add('open');}
 function closeGraph(){document.getElementById('graphOverlay').classList.remove('open');}
 function changeGraphMonth(d){graphMonth=new Date(graphMonth.getFullYear(),graphMonth.getMonth()+d,1);renderGraph();}
-function renderGraphTabs(){document.getElementById('graphHabitTabs').innerHTML=habitDefs.map(function(h){return '<div class="g-ht '+(h.id===selGraphHabit?'active':'')+'" onclick="selGH(\''+h.id+'\')">'+h.emoji+' '+h.name+'</div>';}).join('');}
+function renderGraphTabs(){document.getElementById('graphHabitTabs').innerHTML=habitDefs.map(function(h){return '<div class="g-ht '+(h.id===selGraphHabit?'active':'')+'" onclick="selGH(\''+h.id+'\')">'+h.name+'</div>';}).join('');}
 function selGH(id){selGraphHabit=id;renderGraphTabs();renderGraph();}
 function toggleGraphHabit(hid,ds){toggleHabit(hid,ds);renderGraph();}
 function renderGraph(){
@@ -446,7 +468,7 @@ function renderGraph(){
   if(m===today.getMonth()&&y===today.getFullYear()){for(var d2=today.getDate();d2>=1;d2--){if(logs[y+'-'+pad(m+1)+'-'+pad(d2)])streak++;else break;}}
   var total=(m===today.getMonth()&&y===today.getFullYear())?today.getDate():dim;
   var rate=total?Math.round(checked/total*100):0;
-  document.getElementById('graphStats').innerHTML='<div class="g-sc"><div class="g-sn">'+checked+'</div><div class="g-sl">達成日数</div></div><div class="g-sc"><div class="g-sn">'+streak+'</div><div class="g-sl">連続記録</div></div><div class="g-sc"><div class="g-sn">'+rate+'%</div><div class="g-sl">達成率</div></div>';
+  var el=document.getElementById('graphSummary');if(el)el.innerHTML='<span class="g-sum-label">'+MN[m]+'の達成</span><span class="g-sum-val">'+checked+' / '+total+' 日</span>';
   // 日曜始まり
   var firstDowSun=new Date(y,m,1).getDay(); // Sun=0
   var offsetSun=firstDowSun;
@@ -508,6 +530,7 @@ function render(){
       var metaH='';
       if(task.time&&!task.done)metaH='<div class="task-meta"><span class="time-chip">🕐 '+task.time+'</span><span class="notif-icon '+(task.notif?'on':'')+'" onclick="toggleTaskNotif('+task.id+',event)">'+(task.notif?'🔔':'🔕')+'</span></div>';
       else if(task.time&&task.done)metaH='<div class="task-meta"><span class="time-chip">🕐 '+task.time+'</span></div>';
+      var repeatLabel={daily:'毎日',weekly:'毎週',monthly:'毎月'};var rbadge=task.repeat&&task.repeat!=='none'?'<span class="repeat-badge">'+repeatLabel[task.repeat]+'</span>':'';
       html+='\n<div class="task-card'+(task.urgent?' urgent':'')+(task.done?' done':'')+'" id="card-'+task.id+'" onclick="openEditModal('+task.id+')">'+
         '<div class="cb-wrap"><div class="cb'+(task.done?' checked':'')+'" id="cb-'+task.id+'" onclick="toggleTask('+task.id+',event)">'+
         '<svg width="11" height="9" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
@@ -572,7 +595,11 @@ function showBanner(text,sub){var b=document.getElementById('notifBanner');docum
 function scheduleAll(){requestNotifPermission(function(){tasks.forEach(function(t){scheduleNotif(t);});});}
 function resetForm(){
   ['inputTitle','inputMemo','inputDate','inputTime','customTagInput'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('inputMemo').style.height='64px';;
+  document.getElementById('inputMemo').style.height='64px';
+  repeatMode='none';
+  document.querySelectorAll('.repeat-btn').forEach(function(b){b.classList.remove('selected');});
+  document.querySelector('.repeat-btn').classList.add('selected'); // 「なし」をデフォルト選択
+  document.getElementById('repeatInfo').textContent='';;
   document.getElementById('customTagInput').classList.remove('visible');
   document.querySelectorAll('.tag-option').forEach(function(t){t.classList.remove('selected');});
   selectedTag='';isCustomTag=false;urgentOn=false;notifOn=false;
@@ -608,6 +635,11 @@ function openEditModal(id){
   else if(task.tag){isCustomTag=true;selectedTag=task.tag;var ci=document.getElementById('customTagInput');ci.value=task.tag;ci.classList.add('visible');}
   urgentOn=task.urgent;if(urgentOn){document.getElementById('urgentToggle').classList.add('on');document.getElementById('urgentLabel').textContent='！対応マスト';}
   notifOn=task.notif&&!!task.time;if(notifOn){document.getElementById('notifToggleRow').classList.add('on');document.getElementById('notifLabel').textContent='🔔 通知オン';}
+  // 繰り返し復元
+  repeatMode=task.repeat||'none';
+  document.querySelectorAll('.repeat-btn').forEach(function(b){b.classList.toggle('selected',b.textContent==={none:'なし',daily:'毎日',weekly:'毎週',monthly:'毎月'}[repeatMode]);});
+  var info={none:'',daily:'未完了のまま翌日になると、日付が自動で次の日に更新されます。',weekly:'毎週同じ曜日に新しいタスクが自動作成されます。',monthly:'毎月同じ日に新しいタスクが自動作成されます。'};
+  document.getElementById('repeatInfo').textContent=info[repeatMode]||'';
   document.getElementById('notifHint').classList.toggle('visible',!task.time);
   document.getElementById('modalOverlay').classList.add('open');
 }
@@ -618,6 +650,13 @@ function toggleNotif(){if(!document.getElementById('inputTime').value){document.
 document.getElementById('inputTime').addEventListener('input',function(){var v=document.getElementById('inputTime').value;document.getElementById('notifHint').classList.toggle('visible',!v);if(!v){notifOn=false;document.getElementById('notifToggleRow').classList.remove('on');document.getElementById('notifLabel').textContent='通知オフ';}});
 function autoResizeMemo(){var el=document.getElementById('inputMemo');el.style.height='64px';el.style.height=Math.max(64,el.scrollHeight)+'px';}
 document.getElementById('inputMemo').addEventListener('input',autoResizeMemo);
+function selectRepeat(el,mode){
+  repeatMode=mode;
+  document.querySelectorAll('.repeat-btn').forEach(function(b){b.classList.remove('selected');});
+  el.classList.add('selected');
+  var info={none:'',daily:'未完了のまま翌日になると、日付が自動で次の日に更新されます。',weekly:'毎週同じ曜日に新しいタスクが自動作成されます。',monthly:'毎月同じ日に新しいタスクが自動作成されます。'};
+  document.getElementById('repeatInfo').textContent=info[mode]||'';
+}
 function selectTag(el,name){var already=el.classList.contains('selected');document.querySelectorAll('.tag-option:not(.add-tag)').forEach(function(t){t.classList.remove('selected');});if(!already){el.classList.add('selected');selectedTag=name;}else selectedTag='';document.getElementById('customTagInput').classList.remove('visible');isCustomTag=false;}
 function showCustomTag(){document.querySelectorAll('.tag-option:not(.add-tag)').forEach(function(t){t.classList.remove('selected');});selectedTag='';isCustomTag=true;var i=document.getElementById('customTagInput');i.classList.add('visible');i.focus();}
 async function submitModal(){
@@ -627,16 +666,17 @@ async function submitModal(){
   var date=document.getElementById('inputDate').value;
   var time=document.getElementById('inputTime').value;
   var tag=isCustomTag?document.getElementById('customTagInput').value.trim():selectedTag;
+  var repeat=repeatMode||'none';
   var notif=notifOn&&!!time;
   closeModal();showSync(true);
   if(editingId){
-    var res=await sb.from('tasks').update({title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn}).eq('id',editingId).select().single();
+    var res=await sb.from('tasks').update({title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat}).eq('id',editingId).select().single();
     showSync(false);
-    if(!res.error){var task=tasks.find(function(t){return t.id===editingId;});if(task){Object.assign(task,{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn});scheduleNotif(task);}}
+    if(!res.error){var task=tasks.find(function(t){return t.id===editingId;});if(task){Object.assign(task,{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat});scheduleNotif(task);}}
   }else{
-    var res=await sb.from('tasks').insert([{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false}]).select().single();
+    var res=await sb.from('tasks').insert([{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false,repeat:repeat}]).select().single();
     showSync(false);
-    if(!res.error){var nt={id:res.data.id,title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false,createdAt:new Date(res.data.created_at)};tasks.push(nt);if(notif)requestNotifPermission(function(){scheduleNotif(nt);});}
+    if(!res.error){var nt={id:res.data.id,title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false,repeat:repeat,createdAt:new Date(res.data.created_at)};tasks.push(nt);if(notif)requestNotifPermission(function(){scheduleNotif(nt);});}
   }
   render();
 }
@@ -654,7 +694,7 @@ async function init(){
   // tasks
   var tr=await sb.from('tasks').select('*').order('created_at',{ascending:true});
   if(!tr.error&&tr.data){
-    tasks=tr.data.map(function(r){return{id:r.id,title:r.title,memo:r.memo||'',date:r.date||'',time:r.time||'',notif:!!r.notif,tag:r.tag||'',urgent:!!r.urgent,done:!!r.done,createdAt:new Date(r.created_at)};});
+    tasks=tr.data.map(function(r){return{id:r.id,title:r.title,memo:r.memo||'',date:r.date||'',time:r.time||'',notif:!!r.notif,tag:r.tag||'',urgent:!!r.urgent,done:!!r.done,repeat:r.repeat||'none',createdAt:new Date(r.created_at)};});
   }
   // habit_items
   var hr=await sb.from('habit_items').select('*').order('sort_order',{ascending:true});
@@ -674,10 +714,48 @@ async function init(){
     lr.data.forEach(function(r){if(!habitLogs[r.item_id])habitLogs[r.item_id]={};habitLogs[r.item_id][r.log_date]=true;});
   }
   showSync(false);
+  processRepeatTasks();
   render();
   renderHabitTable();
   scheduleAll();
 }
+
+// 繰り返しタスク処理
+async function processRepeatTasks(){
+  var today=new Date();today.setHours(0,0,0,0);
+  var td=today.getFullYear()+'-'+pad(today.getMonth()+1)+'-'+pad(today.getDate());
+  for(var i=0;i<tasks.length;i++){
+    var t=tasks[i];
+    if(!t.repeat||t.repeat==='none'||t.done)continue;
+    if(!t.date)continue;
+    var td2=new Date(t.date+'T00:00');td2.setHours(0,0,0,0);
+    if(td2>=today)continue; // 今日以降はスキップ
+    if(t.repeat==='daily'){
+      // 未完了のまま日付が過ぎていたら今日に更新
+      t.date=td;
+      await sb.from('tasks').update({date:td,done:false}).eq('id',t.id);
+    } else if(t.repeat==='weekly'){
+      // 前回から7日後に新タスク作成
+      var nextDate=new Date(td2);nextDate.setDate(td2.getDate()+7);
+      var nd=nextDate.getFullYear()+'-'+pad(nextDate.getMonth()+1)+'-'+pad(nextDate.getDate());
+      // 同名の未来タスクがなければ作成
+      var exists=tasks.some(function(x){return x.title===t.title&&x.date>=td&&x.id!==t.id;});
+      if(!exists){
+        var res=await sb.from('tasks').insert([{title:t.title,memo:t.memo,date:nd,time:t.time,notif:false,tag:t.tag,urgent:t.urgent,done:false,repeat:'weekly'}]).select().single();
+        if(!res.error){tasks.push({id:res.data.id,title:t.title,memo:t.memo||'',date:nd,time:t.time||'',notif:false,tag:t.tag||'',urgent:t.urgent,done:false,repeat:'weekly',createdAt:new Date(res.data.created_at)});}
+      }
+    } else if(t.repeat==='monthly'){
+      var nextDate=new Date(td2);nextDate.setMonth(td2.getMonth()+1);
+      var nd=nextDate.getFullYear()+'-'+pad(nextDate.getMonth()+1)+'-'+pad(nextDate.getDate());
+      var exists=tasks.some(function(x){return x.title===t.title&&x.date>=td&&x.id!==t.id;});
+      if(!exists){
+        var res=await sb.from('tasks').insert([{title:t.title,memo:t.memo,date:nd,time:t.time,notif:false,tag:t.tag,urgent:t.urgent,done:false,repeat:'monthly'}]).select().single();
+        if(!res.error){tasks.push({id:res.data.id,title:t.title,memo:t.memo||'',date:nd,time:t.time||'',notif:false,tag:t.tag||'',urgent:t.urgent,done:false,repeat:'monthly',createdAt:new Date(res.data.created_at)});}
+      }
+    }
+  }
+}
+
 init();
 </script>
 </body>
