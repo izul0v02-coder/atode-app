@@ -32,7 +32,7 @@
   .theme-option.active{border-color:var(--accent);}
   .theme-dot{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(0,0,0,.1);}
   /* Tabs */
-  .tabs{display:flex;gap:4px;padding:10px 0 12px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+  .tabs{display:flex;gap:4px;padding:8px 16px 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
   .tab{padding:5px 12px;border-radius:20px;font-size:12px;white-space:nowrap;cursor:pointer;border:none;font-family:'Noto Sans JP',sans-serif;transition:all .2s;background:transparent;color:var(--text-sub);flex-shrink:0;}
   .tab.active{background:var(--accent);color:#fff;}
@@ -162,6 +162,8 @@
   .hi-row:last-child{border-bottom:none;}
   .hi-dh{color:var(--text-sub);font-size:16px;cursor:grab;padding:0 2px;touch-action:none;}
   .hi-em{font-size:20px;}.hi-nm{flex:1;font-size:14px;color:var(--text);}
+  .hi-name-input{flex:1;border:none;background:transparent;font-size:14px;color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;padding:2px 4px;border-radius:4px;}
+  .hi-name-input:focus{background:var(--bg2);}
   .hi-del{background:none;border:none;color:var(--text-sub);font-size:16px;cursor:pointer;padding:4px;opacity:.5;}
   .hi-del:hover{opacity:1;color:#e04040;}
   .add-hr{display:flex;gap:8px;margin-top:14px;}
@@ -254,12 +256,6 @@
         <button class="add-btn" onclick="openAddModal()">+</button>
       </div>
     </div>
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab('all',this)">すべて</button>
-      <button class="tab" onclick="switchTab('todo',this)">未完了</button>
-      <button class="tab" onclick="switchTab('done',this)">完了済み</button>
-      <button class="tab" onclick="switchTab('urgent',this)">！ 必須</button>
-    </div>
   </div>
   <div class="habit-section">
     <div class="habit-header">
@@ -268,6 +264,12 @@
     </div>
     <div id="habitTable"></div>
   </div>
+  <div class="tabs">
+      <button class="tab active" id="tab-all" onclick="switchTab('all',this)">すべて</button>
+      <button class="tab" id="tab-todo" onclick="switchTab('todo',this)">未完了</button>
+      <button class="tab" id="tab-done" onclick="switchTab('done',this)">完了済み</button>
+      <button class="tab" id="tab-urgent" onclick="switchTab('urgent',this)">！ 必須</button>
+    </div>
   <div class="list" id="taskList"></div>
 </div>
 <div class="bottom-bar">
@@ -364,7 +366,7 @@ var tasks=[];
 var habitDefs=[];
 var habitLogs={};
 var nextHabitId=Date.now();
-var sortByDate=false,currentTab='all',selectedTag='',urgentOn=false,notifOn=false,isCustomTag=false,repeatMode='none',linkedHabitId=null;
+var sortByDate=localStorage.getItem('atode_sort')==='date',currentTab=localStorage.getItem('atode_tab')||'all',selectedTag='',urgentOn=false,notifOn=false,isCustomTag=false,repeatMode='none',linkedHabitId=null;
 var notifTimers={},editingId=null,pendingDeleteId=null;
 var graphMonth=new Date(),selGraphHabit=null;
 var dragSrc=null;
@@ -407,6 +409,7 @@ function renderHabitTable(){
   wrap.innerHTML=html;
 }
 async function toggleHabit(hid,ds){
+  hid=String(hid);
   if(!habitLogs[hid])habitLogs[hid]={};
   var wasChecked=!!habitLogs[hid][ds];
   // UIを即時更新
@@ -445,8 +448,20 @@ function openManageSheet(){renderHabitItemList();document.getElementById('manage
 function closeManageSheet(){document.getElementById('manageSheetOverlay').classList.remove('open');}
 function renderHabitItemList(){
   document.getElementById('habitItemList').innerHTML=habitDefs.map(function(h,i){
-    return '<div class="hi-row" draggable="true" data-idx="'+i+'" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)"><span class="hi-dh">⠿</span><span class="hi-nm">'+h.name+'</span><button class="hi-del" onclick="removeHabitItem(\''+h.id+'\')">✕</button></div>';
+    return '<div class="hi-row" draggable="true" data-idx="'+i+'" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dragDrop(event)">'+
+      '<span class="hi-dh">⠿</span>'+
+      '<input class="hi-name-input" value="'+h.name.replace(/"/g,'&quot;')+'" onblur="renameHabitItem(\''+h.id+'\',this.value)" onkeydown="if(event.key===\'Enter\')this.blur()">'+
+      '<button class="hi-del" onclick="removeHabitItem(\''+h.id+'\')">✕</button></div>';
   }).join('');
+}
+async function renameHabitItem(id,newName){
+  newName=(newName||'').trim();
+  if(!newName)return;
+  var h=habitDefs.find(function(x){return String(x.id)===String(id);});
+  if(!h||h.name===newName)return;
+  h.name=newName;
+  renderHabitTable();
+  await sb.from('habit_items').update({name:newName}).eq('id',id);
 }
 async function addHabitItem(){
   var name=document.getElementById('newHabitName').value.trim();
@@ -456,7 +471,7 @@ async function addHabitItem(){
   var res=await sb.from('habit_items').insert([{emoji:emoji,name:name,sort_order:sortOrder}]).select().single();
   if(res.error){console.error(res.error);return;}
   var h=res.data;
-  habitDefs.push({id:h.id,emoji:h.emoji,name:h.name});
+  habitDefs.push({id:String(h.id),emoji:h.emoji||'',name:h.name});
   habitLogs[h.id]={};
   renderHabitItemList();renderHabitTable();
   document.getElementById('newHabitName').value='';document.getElementById('emojiPickerBtn').textContent='😊';
@@ -531,8 +546,8 @@ function renderGraph(){
 var praises=['すごい！✨','天才！🌟','さすが！🎉','やったね！🥳','完璧！💯','えらい！👏','最高！🔥','素晴らしい！🌸','できた！🎊','ナイス！🙌','やるじゃん！👍'];
 function fmtDate(s){if(!s)return null;var d=new Date(s+'T00:00');return (d.getMonth()+1)+'/'+d.getDate();}
 function fmtHead(s){if(!s)return '日付なし';var d=new Date(s+'T00:00');var D=['日','月','火','水','木','金','土'];return (d.getMonth()+1)+'月'+d.getDate()+'日（'+D[d.getDay()]+'）';}
-function toggleSort(){sortByDate=!sortByDate;document.getElementById('sortLabel').textContent=sortByDate?'作成順':'日付順';document.getElementById('sortBtn').classList.toggle('active',sortByDate);render();}
-function switchTab(tab,el){currentTab=tab;document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});el.classList.add('active');render();}
+function toggleSort(){sortByDate=!sortByDate;localStorage.setItem('atode_sort',sortByDate?'date':'');document.getElementById('sortLabel').textContent=sortByDate?'作成順':'日付順';document.getElementById('sortBtn').classList.toggle('active',sortByDate);render();}
+function switchTab(tab,el){currentTab=tab;localStorage.setItem('atode_tab',tab);document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});el.classList.add('active');render();}
 function getFiltered(){
   var t=tasks.slice();
   if(currentTab==='todo')t=t.filter(function(x){return!x.done;});
@@ -755,11 +770,12 @@ async function submitModal(){
   var repeat=repeatMode||'none';
   var linked_habit=repeat==='daily'?linkedHabitId:null;
   var notif=notifOn&&!!time;
+  var currentEditId=editingId;
   closeModal();showSync(true);
-  if(editingId){
-    var res=await sb.from('tasks').update({title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat,linked_habit:linked_habit}).eq('id',editingId).select().single();
+  if(currentEditId){
+    var res=await sb.from('tasks').update({title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat,linked_habit:linked_habit}).eq('id',currentEditId).select().single();
     showSync(false);
-    if(!res.error){var task=tasks.find(function(t){return t.id===editingId;});if(task){Object.assign(task,{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat,linked_habit:linked_habit});scheduleNotif(task);}}
+    if(!res.error){var task=tasks.find(function(t){return t.id===currentEditId;});if(task){Object.assign(task,{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat,linked_habit:linked_habit});scheduleNotif(task);}}
   }else{
     var res=await sb.from('tasks').insert([{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false,repeat:repeat,linked_habit:linked_habit}]).select().single();
     showSync(false);
@@ -793,12 +809,12 @@ async function init(){
     var hr=await sb.from('habit_items').select('*').order('sort_order',{ascending:true});
     if(!hr.error&&hr.data){
       if(hr.data.length){
-        habitDefs=hr.data.map(function(r){return{id:r.id,emoji:r.emoji||'',name:r.name};});
+        habitDefs=hr.data.map(function(r){return{id:String(r.id),emoji:r.emoji||'',name:r.name};});
       }else{
         // テーブルは存在するが空 → デフォルト挿入
         var defaults=[{emoji:'',name:'習慣1',sort_order:0}];
         var dr=await sb.from('habit_items').insert(defaults).select();
-        if(!dr.error&&dr.data)habitDefs=dr.data.map(function(r){return{id:r.id,emoji:'',name:r.name};});
+        if(!dr.error&&dr.data)habitDefs=dr.data.map(function(r){return{id:String(r.id),emoji:'',name:r.name};});
       }
     }
     selGraphHabit=habitDefs[0]?habitDefs[0].id:null;
@@ -806,52 +822,64 @@ async function init(){
     var lr=await sb.from('habit_logs').select('item_id,log_date');
     if(!lr.error&&lr.data){
       habitLogs={};
-      lr.data.forEach(function(r){if(!habitLogs[r.item_id])habitLogs[r.item_id]={};habitLogs[r.item_id][r.log_date]=true;});
+      lr.data.forEach(function(r){var key=String(r.item_id);if(!habitLogs[key])habitLogs[key]={};habitLogs[key][r.log_date]=true;});
     }
   } catch(e) {
     console.error('init error:', e);
   }
   showSync(false);
   try { processRepeatTasks(); } catch(e){ console.error('repeat error:',e); }
+  // ソート・タブ状態を復元
+  if(sortByDate){document.getElementById('sortLabel').textContent='作成順';document.getElementById('sortBtn').classList.add('active');}
+  var savedTab=localStorage.getItem('atode_tab')||'all';
+  currentTab=savedTab;
+  var tabEl=document.getElementById('tab-'+savedTab);
+  if(tabEl){document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});tabEl.classList.add('active');}
   render();
   renderHabitTable();
   scheduleAll();
 }
 
-// 繰り返しタスク処理
+// 繰り返しタスク処理（ページロード時1回のみ、重複防止）
 async function processRepeatTasks(){
   var today=new Date();today.setHours(0,0,0,0);
-  var td=today.getFullYear()+'-'+pad(today.getMonth()+1)+'-'+pad(today.getDate());
+  var td=todayStr();
+  // dailyのみ処理（weekly/monthlyはSupabase側で重複チェックしてから）
+  var toUpdate=[];
+  var toInsertWeekly=[];
+  var toInsertMonthly=[];
   for(var i=0;i<tasks.length;i++){
     var t=tasks[i];
-    if(!t.repeat||t.repeat==='none'||t.done)continue;
+    if(!t.repeat||t.repeat==='none')continue;
     if(!t.date)continue;
-    var td2=new Date(t.date+'T00:00');td2.setHours(0,0,0,0);
-    if(td2>=today)continue; // 今日以降はスキップ
-    if(t.repeat==='daily'){
-      // 未完了のまま日付が過ぎていたら今日に更新（完了済みは動かさない）
-      if(t.done)continue;
-      t.date=td;
-      await sb.from('tasks').update({date:td}).eq('id',t.id);
-    } else if(t.repeat==='weekly'){
-      // 前回から7日後に新タスク作成
-      var nextDate=new Date(td2);nextDate.setDate(td2.getDate()+7);
-      var nd=nextDate.getFullYear()+'-'+pad(nextDate.getMonth()+1)+'-'+pad(nextDate.getDate());
-      // 同名の未来タスクがなければ作成
-      var exists=tasks.some(function(x){return x.title===t.title&&x.date>=td&&x.id!==t.id;});
-      if(!exists){
-        var res=await sb.from('tasks').insert([{title:t.title,memo:t.memo,date:nd,time:t.time,notif:false,tag:t.tag,urgent:t.urgent,done:false,repeat:'weekly'}]).select().single();
-        if(!res.error){tasks.push({id:res.data.id,title:t.title,memo:t.memo||'',date:nd,time:t.time||'',notif:false,tag:t.tag||'',urgent:t.urgent,done:false,repeat:'weekly',createdAt:new Date(res.data.created_at)});}
-      }
-    } else if(t.repeat==='monthly'){
-      var nextDate=new Date(td2);nextDate.setMonth(td2.getMonth()+1);
-      var nd=nextDate.getFullYear()+'-'+pad(nextDate.getMonth()+1)+'-'+pad(nextDate.getDate());
-      var exists=tasks.some(function(x){return x.title===t.title&&x.date>=td&&x.id!==t.id;});
-      if(!exists){
-        var res=await sb.from('tasks').insert([{title:t.title,memo:t.memo,date:nd,time:t.time,notif:false,tag:t.tag,urgent:t.urgent,done:false,repeat:'monthly'}]).select().single();
-        if(!res.error){tasks.push({id:res.data.id,title:t.title,memo:t.memo||'',date:nd,time:t.time||'',notif:false,tag:t.tag||'',urgent:t.urgent,done:false,repeat:'monthly',createdAt:new Date(res.data.created_at)});}
-      }
+    var taskDate=new Date(t.date+'T00:00');taskDate.setHours(0,0,0,0);
+    if(taskDate>=today)continue; // まだ期限来てない
+    if(t.repeat==='daily'&&!t.done){
+      toUpdate.push(t);
+    } else if(t.repeat==='weekly'&&t.done){
+      // 完了済みweeklyのみ次を作成
+      var nextD=new Date(taskDate);nextD.setDate(taskDate.getDate()+7);
+      var nd=dateStr(nextD);
+      var exists=tasks.some(function(x){return x.title===t.title&&x.repeat==='weekly'&&!x.done&&x.id!==t.id;});
+      if(!exists)toInsertWeekly.push({src:t,nd:nd});
+    } else if(t.repeat==='monthly'&&t.done){
+      // 完了済みmonthlyのみ次を作成
+      var nextD=new Date(taskDate);nextD.setMonth(taskDate.getMonth()+1);
+      var nd=dateStr(nextD);
+      var exists=tasks.some(function(x){return x.title===t.title&&x.repeat==='monthly'&&!x.done&&x.id!==t.id;});
+      if(!exists)toInsertMonthly.push({src:t,nd:nd});
     }
+  }
+  for(var i=0;i<toUpdate.length;i++){
+    var t=toUpdate[i];
+    t.date=td;
+    await sb.from('tasks').update({date:td,done:false}).eq('id',t.id);
+  }
+  var inserts=toInsertWeekly.concat(toInsertMonthly);
+  for(var i=0;i<inserts.length;i++){
+    var src=inserts[i].src,nd=inserts[i].nd;
+    var res=await sb.from('tasks').insert([{title:src.title,memo:src.memo,date:nd,time:src.time,notif:false,tag:src.tag,urgent:src.urgent,done:false,repeat:src.repeat,linked_habit:src.linked_habit||null}]).select().single();
+    if(!res.error){tasks.push({id:res.data.id,title:src.title,memo:src.memo||'',date:nd,time:src.time||'',notif:false,tag:src.tag||'',urgent:src.urgent,done:false,repeat:src.repeat,linked_habit:src.linked_habit||null,createdAt:new Date(res.data.created_at)});}
   }
 }
 
