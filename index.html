@@ -708,7 +708,7 @@ function openEditModal(id){
     var row=document.getElementById('habitLinkRow');row.classList.add('visible');
     var opts=document.getElementById('habitLinkOpts');
     opts.innerHTML='<div class="habit-link-btn'+(linkedHabitId===null?' selected':'')+'" onclick="selectHabitLink(null,this)">なし</div>'+
-      habitDefs.map(function(h){return '<div class="habit-link-btn'+(linkedHabitId===String(h.id)?' selected':'')+'" onclick="selectHabitLink(''+h.id+'',this)">'+h.name+'</div>';}).join('');
+      habitDefs.map(function(h){return '<div class="habit-link-btn'+(linkedHabitId===String(h.id)?' selected':'')+'" onclick="selectHabitLink(\''+h.id+'\',this)">'+h.name+'</div>';}).join('');
   }
   document.getElementById('notifHint').classList.toggle('visible',!task.time);
   document.getElementById('modalOverlay').classList.add('open');
@@ -732,7 +732,7 @@ function selectRepeat(el,mode){
     row.classList.add('visible');
     var opts=document.getElementById('habitLinkOpts');
     opts.innerHTML='<div class="habit-link-btn'+(linkedHabitId===null?' selected':'')+'" onclick="selectHabitLink(null,this)">なし</div>'+
-      habitDefs.map(function(h){return '<div class="habit-link-btn'+(linkedHabitId===h.id?' selected':'')+'" onclick="selectHabitLink(''+h.id+'',this)">'+h.name+'</div>';}).join('');
+      habitDefs.map(function(h){return '<div class="habit-link-btn'+(linkedHabitId===h.id?' selected':'')+'" onclick="selectHabitLink(\''+h.id+'\',this)">'+h.name+'</div>';}).join('');
   }else{
     row.classList.remove('visible');
     linkedHabitId=null;
