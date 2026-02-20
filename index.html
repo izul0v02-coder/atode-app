@@ -164,6 +164,9 @@
   .hi-em{font-size:20px;}.hi-nm{flex:1;font-size:14px;color:var(--text);}
   .hi-name-input{flex:1;border:none;background:transparent;font-size:14px;color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;padding:2px 4px;border-radius:4px;}
   .hi-name-input:focus{background:var(--bg2);}
+  .hi-arrow{background:none;border:none;color:var(--text-sub);font-size:13px;cursor:pointer;padding:2px 5px;opacity:.6;line-height:1;}
+  .hi-arrow:hover{opacity:1;color:var(--accent);}
+  .hi-arrows{display:flex;flex-direction:column;gap:0;}
   .hi-del{background:none;border:none;color:var(--text-sub);font-size:16px;cursor:pointer;padding:4px;opacity:.5;}
   .hi-del:hover{opacity:1;color:#e04040;}
   .add-hr{display:flex;gap:8px;margin-top:14px;}
@@ -230,6 +233,12 @@
   /* habit praise bubble - テーブルセル基準で表示 */
   .habit-praise{position:fixed;background:var(--text);color:var(--bg);font-size:12px;font-weight:700;padding:4px 10px;border-radius:18px;white-space:nowrap;pointer-events:none;z-index:9999;animation:pbop 1.6s ease forwards;}
   .habit-praise::after{content:'';position:absolute;left:10px;bottom:-5px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--text);}
+  /* 時間クイック選択 */
+  .time-quick{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+  .time-chip-btn{padding:5px 10px;border-radius:16px;font-size:12px;border:1.5px solid var(--border);background:var(--bg);color:var(--text-sub);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;}
+  .time-chip-btn.selected{background:var(--ap);border-color:var(--al);color:var(--accent);font-weight:600;}
+  .time-custom-wrap{display:flex;align-items:center;gap:6px;margin-top:6px;}
+  .time-custom-label{font-size:12px;color:var(--text-sub);white-space:nowrap;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -283,7 +292,22 @@
     <div class="form-group"><div class="form-label">メモ</div><textarea class="form-textarea" id="inputMemo" placeholder="メモ（任意）"></textarea></div>
     <div class="form-row">
       <div class="form-group"><div class="form-label">日付</div><input class="form-input" id="inputDate" type="date"></div>
-      <div class="form-group"><div class="form-label">時間</div><input class="form-input" id="inputTime" type="time"></div>
+      <div class="form-group">
+        <div class="form-label">時間</div>
+        <div class="time-quick" id="timeQuick">
+          <div class="time-chip-btn" onclick="selectTime(this,'07:00')">7:00</div>
+          <div class="time-chip-btn" onclick="selectTime(this,'08:00')">8:00</div>
+          <div class="time-chip-btn" onclick="selectTime(this,'09:00')">9:00</div>
+          <div class="time-chip-btn" onclick="selectTime(this,'12:00')">12:00</div>
+          <div class="time-chip-btn" onclick="selectTime(this,'18:00')">18:00</div>
+          <div class="time-chip-btn" onclick="selectTime(this,'21:00')">21:00</div>
+          <div class="time-chip-btn" onclick="selectTime(this,'')">なし</div>
+        </div>
+        <div class="time-custom-wrap">
+          <span class="time-custom-label">カスタム：</span>
+          <input class="form-input" id="inputTime" type="time" style="flex:1" oninput="onTimeInput(this.value)">
+        </div>
+      </div>
     </div>
     <div class="form-group">
       <div class="form-label">通知</div>
@@ -483,15 +507,11 @@ async function removeHabitItem(id){
   delete habitLogs[id];
   renderHabitItemList();renderHabitTable();
 }
-function dragStart(e){dragSrc=e.currentTarget;e.dataTransfer.effectAllowed='move';}
-function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';}
-async function dragDrop(e){
-  e.preventDefault();
-  var fi=parseInt(dragSrc.dataset.idx),ti=parseInt(e.currentTarget.dataset.idx);
-  if(fi===ti)return;
-  var item=habitDefs.splice(fi,1)[0];habitDefs.splice(ti,0,item);
+async function moveHabitItem(idx,dir){
+  var ni=idx+dir;
+  if(ni<0||ni>=habitDefs.length)return;
+  var tmp=habitDefs[idx];habitDefs[idx]=habitDefs[ni];habitDefs[ni]=tmp;
   renderHabitItemList();renderHabitTable();
-  // 全アイテムのsort_orderを一括更新
   for(var i=0;i<habitDefs.length;i++){
     await sb.from('habit_items').update({sort_order:i}).eq('id',habitDefs[i].id);
   }
@@ -615,7 +635,7 @@ async function toggleTask(id,e){
       if(!habitLogs[task.linked_habit][ds]){
         habitLogs[task.linked_habit][ds]=true;
         renderHabitTable();
-        sb.from('habit_logs').insert([{item_id:task.linked_habit,log_date:ds}]);
+        sb.from('habit_logs').insert([{item_id:parseInt(task.linked_habit),log_date:ds}]);
       }
     }
     setTimeout(function(){render();},1200);
@@ -693,6 +713,7 @@ function openAddModal(){
   document.getElementById('submitBtn').textContent='追加する';
   document.getElementById('deleteInModalBtn').style.display='none';
   document.getElementById('inputDate').value=new Date().toISOString().split('T')[0];
+  document.querySelectorAll('.time-chip-btn').forEach(function(b){b.classList.remove('selected');});document.querySelector('.time-chip-btn[onclick*="\'\'"]')&&document.querySelector('.time-chip-btn[onclick*="\'\'"]').classList.add('selected');
   document.getElementById('modalOverlay').classList.add('open');
   setTimeout(function(){document.getElementById('inputTitle').focus();},120);
 }
@@ -707,6 +728,9 @@ function openEditModal(id){
   setTimeout(autoResizeMemo,0);
   document.getElementById('inputDate').value=task.date||'';
   document.getElementById('inputTime').value=task.time||'';
+  // 時間ボタン選択状態を復元
+  document.querySelectorAll('.time-chip-btn').forEach(function(b){var m=b.getAttribute('onclick').match(/\'([^\']*)\'/);
+    b.classList.toggle('selected',m&&m[1]===(task.time||''));});
   var tagEls=Array.from(document.querySelectorAll('.tag-option:not(.add-tag)'));
   var matched=tagEls.find(function(el){return el.textContent===task.tag;});
   if(matched){matched.classList.add('selected');selectedTag=task.tag;}
@@ -730,9 +754,23 @@ function openEditModal(id){
 }
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');editingId=null;}
 function handleOverlayClick(e){if(e.target===e.currentTarget)closeModal();}
+function selectTime(el,val){
+  document.getElementById('inputTime').value=val;
+  document.querySelectorAll('.time-chip-btn').forEach(function(b){b.classList.remove('selected');});
+  el.classList.add('selected');
+  onTimeInput(val);
+}
+function onTimeInput(val){
+  // カスタム入力時はクイック選択のハイライトをリセット
+  document.querySelectorAll('.time-chip-btn').forEach(function(b){
+    b.classList.toggle('selected', b.dataset&&b.getAttribute('onclick')&&b.getAttribute('onclick').indexOf("'"+val+"'")>-1);
+  });
+  document.getElementById('notifHint').classList.toggle('visible',!val);
+  if(!val){notifOn=false;document.getElementById('notifToggleRow').classList.remove('on');document.getElementById('notifLabel').textContent='通知オフ';}
+}
 function toggleUrgent(){urgentOn=!urgentOn;document.getElementById('urgentToggle').classList.toggle('on',urgentOn);document.getElementById('urgentLabel').textContent=urgentOn?'！対応マスト':'オフ';}
 function toggleNotif(){if(!document.getElementById('inputTime').value){document.getElementById('notifHint').classList.add('visible');return;}notifOn=!notifOn;document.getElementById('notifToggleRow').classList.toggle('on',notifOn);document.getElementById('notifLabel').textContent=notifOn?'🔔 通知オン':'通知オフ';if(notifOn)requestNotifPermission(null);}
-document.getElementById('inputTime').addEventListener('input',function(){var v=document.getElementById('inputTime').value;document.getElementById('notifHint').classList.toggle('visible',!v);if(!v){notifOn=false;document.getElementById('notifToggleRow').classList.remove('on');document.getElementById('notifLabel').textContent='通知オフ';}});
+document.getElementById('inputTime').addEventListener('input',function(){onTimeInput(this.value);});
 function autoResizeMemo(){var el=document.getElementById('inputMemo');el.style.height='64px';el.style.height=Math.max(64,el.scrollHeight)+'px';}
 document.getElementById('inputMemo').addEventListener('input',autoResizeMemo);
 function selectRepeat(el,mode){
