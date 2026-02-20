@@ -218,6 +218,16 @@
   .repeat-info{font-size:11px;color:var(--text-sub);margin-top:5px;line-height:1.5;}
   /* 繰り返しタスクバッジ */
   .repeat-badge{font-size:10px;background:var(--bg2);color:var(--text-sub);border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle;}
+  /* 習慣リンクトグル */
+  .habit-link-row{display:none;margin-top:8px;background:var(--bg2);border-radius:10px;padding:8px 12px;}
+  .habit-link-row.visible{display:block;}
+  .habit-link-label{font-size:11px;color:var(--text-sub);margin-bottom:6px;}
+  .habit-link-opts{display:flex;flex-wrap:wrap;gap:5px;}
+  .habit-link-btn{padding:4px 10px;border-radius:16px;font-size:11px;border:1.5px solid var(--border);background:var(--bg);color:var(--text-sub);cursor:pointer;transition:all .15s;}
+  .habit-link-btn.selected{background:var(--ap);border-color:var(--al);color:var(--accent);font-weight:600;}
+  /* habit praise bubble - テーブルセル基準で表示 */
+  .habit-praise{position:fixed;background:var(--text);color:var(--bg);font-size:12px;font-weight:700;padding:4px 10px;border-radius:18px;white-space:nowrap;pointer-events:none;z-index:9999;animation:pbop 1.6s ease forwards;}
+  .habit-praise::after{content:'';position:absolute;left:10px;bottom:-5px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--text);}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -291,6 +301,10 @@
         <div class="repeat-btn" onclick="selectRepeat(this,'monthly')">毎月</div>
       </div>
       <div class="repeat-info" id="repeatInfo"></div>
+      <div class="habit-link-row" id="habitLinkRow">
+        <div class="habit-link-label">習慣にも追加してチェックを連動する</div>
+        <div class="habit-link-opts" id="habitLinkOpts"></div>
+      </div>
     </div>
     <div class="form-group">
       <div class="form-label">タグ</div>
@@ -350,7 +364,7 @@ var tasks=[];
 var habitDefs=[];
 var habitLogs={};
 var nextHabitId=Date.now();
-var sortByDate=false,currentTab='all',selectedTag='',urgentOn=false,notifOn=false,isCustomTag=false,repeatMode='none';
+var sortByDate=false,currentTab='all',selectedTag='',urgentOn=false,notifOn=false,isCustomTag=false,repeatMode='none',linkedHabitId=null;
 var notifTimers={},editingId=null,pendingDeleteId=null;
 var graphMonth=new Date(),selGraphHabit=null;
 var dragSrc=null;
@@ -394,15 +408,35 @@ function renderHabitTable(){
 }
 async function toggleHabit(hid,ds){
   if(!habitLogs[hid])habitLogs[hid]={};
-  if(habitLogs[hid][ds]){
-    delete habitLogs[hid][ds];
-    await sb.from('habit_logs').delete().eq('item_id',hid).eq('log_date',ds);
-  }else{
-    habitLogs[hid][ds]=true;
-    await sb.from('habit_logs').insert([{item_id:hid,log_date:ds}]);
-  }
+  var wasChecked=!!habitLogs[hid][ds];
+  // UIを即時更新
+  if(wasChecked){delete habitLogs[hid][ds];}else{habitLogs[hid][ds]=true;}
   renderHabitTable();
   if(document.getElementById('graphOverlay').classList.contains('open'))renderGraph();
+  // チェックON時に褒めバブル
+  if(!wasChecked){
+    var dotEl=event&&event.target;
+    if(dotEl){
+      var rect=dotEl.getBoundingClientRect();
+      var b=document.createElement('div');b.className='habit-praise';
+      b.textContent=praises[Math.floor(Math.random()*praises.length)];
+      b.style.left=rect.left+'px';b.style.top=(rect.top-36)+'px';
+      document.body.appendChild(b);setTimeout(function(){b.remove();},1700);
+    }
+  }
+  // Supabaseに保存（失敗したらロールバック）
+  var res;
+  if(wasChecked){
+    res=await sb.from('habit_logs').delete().eq('item_id',hid).eq('log_date',ds);
+  }else{
+    res=await sb.from('habit_logs').insert([{item_id:hid,log_date:ds}]);
+  }
+  if(res.error){
+    // ロールバック
+    if(wasChecked){habitLogs[hid][ds]=true;}else{delete habitLogs[hid][ds];}
+    renderHabitTable();
+    console.error('toggleHabit error:',res.error);
+  }
 }
 function openManageSheet(){renderHabitItemList();document.getElementById('manageSheetOverlay').classList.add('open');}
 function closeManageSheet(){document.getElementById('manageSheetOverlay').classList.remove('open');}
@@ -541,30 +575,54 @@ function render(){
   });
   list.innerHTML=html;
 }
-function toggleTask(id,e){
+async function toggleTask(id,e){
   e.stopPropagation();
   var task=tasks.find(function(t){return t.id===id;});if(!task)return;
-  task.done=!task.done;
-  if(task.done){
+  var newDone=!task.done;
+  // UIを即時更新（楽観的更新）
+  var card=document.getElementById('card-'+id),cb=document.getElementById('cb-'+id);
+  if(newDone){
+    task.done=true;
     spawnSparkles(document.getElementById('sp-'+id));
     var cbWrap=document.getElementById('cb-'+id);
     if(cbWrap&&cbWrap.parentElement){var b=document.createElement('div');b.className='praise';b.textContent=praises[Math.floor(Math.random()*praises.length)];cbWrap.parentElement.appendChild(b);setTimeout(function(){b.remove();},1700);}
-    var card=document.getElementById('card-'+id),cb=document.getElementById('cb-'+id);
     if(card){card.classList.add('done');card.classList.remove('urgent');}
     if(cb){cb.classList.add('checked');cb.querySelector('svg').style.display='block';}
     var te=card&&card.querySelector('.task-title');if(te)te.style.textDecoration='line-through';
     if(notifTimers[id]){clearTimeout(notifTimers[id]);delete notifTimers[id];}
-    setTimeout(function(){render();},1100);
-  }else{render();scheduleNotif(task);}
-  sb.from('tasks').update({done:task.done}).eq('id',id);
+    // 連動ハビットがあればチェック
+    if(task.linked_habit){
+      var ds=todayStr();
+      if(!habitLogs[task.linked_habit])habitLogs[task.linked_habit]={};
+      if(!habitLogs[task.linked_habit][ds]){
+        habitLogs[task.linked_habit][ds]=true;
+        renderHabitTable();
+        sb.from('habit_logs').insert([{item_id:task.linked_habit,log_date:ds}]);
+      }
+    }
+    setTimeout(function(){render();},1200);
+  }else{
+    task.done=false;
+    if(card){card.classList.remove('done');}
+    if(cb){cb.classList.remove('checked');}
+    render();scheduleNotif(task);
+  }
+  // Supabaseに保存（失敗したらロールバック）
+  var res=await sb.from('tasks').update({done:newDone}).eq('id',id);
+  if(res.error){
+    task.done=!newDone; // ロールバック
+    render();
+    console.error('toggleTask error:',res.error);
+  }
 }
-function toggleTaskNotif(id,e){
+async function toggleTaskNotif(id,e){
   e.stopPropagation();
   var task=tasks.find(function(t){return t.id===id;});if(!task)return;
   task.notif=!task.notif;
   if(task.notif)requestNotifPermission(function(){scheduleNotif(task);});
   else if(notifTimers[id]){clearTimeout(notifTimers[id]);delete notifTimers[id];}
-  sb.from('tasks').update({notif:task.notif}).eq('id',id);
+  var res2=await sb.from('tasks').update({notif:task.notif}).eq('id',id);
+  if(res2.error){task.notif=!task.notif;}
   render();
 }
 function askDelete(id,e){if(e)e.stopPropagation();var task=tasks.find(function(t){return t.id===id;});if(!task)return;pendingDeleteId=id;document.getElementById('confirmSub').textContent='「'+task.title+'」を削除します';document.getElementById('confirmOverlay').classList.add('open');}
@@ -599,7 +657,9 @@ function resetForm(){
   repeatMode='none';
   document.querySelectorAll('.repeat-btn').forEach(function(b){b.classList.remove('selected');});
   document.querySelector('.repeat-btn').classList.add('selected'); // 「なし」をデフォルト選択
-  document.getElementById('repeatInfo').textContent='';;
+  document.getElementById('repeatInfo').textContent='';
+  linkedHabitId=null;
+  document.getElementById('habitLinkRow').classList.remove('visible');;
   document.getElementById('customTagInput').classList.remove('visible');
   document.querySelectorAll('.tag-option').forEach(function(t){t.classList.remove('selected');});
   selectedTag='';isCustomTag=false;urgentOn=false;notifOn=false;
@@ -640,6 +700,13 @@ function openEditModal(id){
   document.querySelectorAll('.repeat-btn').forEach(function(b){b.classList.toggle('selected',b.textContent==={none:'なし',daily:'毎日',weekly:'毎週',monthly:'毎月'}[repeatMode]);});
   var info={none:'',daily:'未完了のまま翌日になると、日付が自動で次の日に更新されます。',weekly:'毎週同じ曜日に新しいタスクが自動作成されます。',monthly:'毎月同じ日に新しいタスクが自動作成されます。'};
   document.getElementById('repeatInfo').textContent=info[repeatMode]||'';
+  linkedHabitId=task.linked_habit||null;
+  if(repeatMode==='daily'){
+    var row=document.getElementById('habitLinkRow');row.classList.add('visible');
+    var opts=document.getElementById('habitLinkOpts');
+    opts.innerHTML='<div class="habit-link-btn'+(linkedHabitId===null?' selected':'')+'" onclick="selectHabitLink(null,this)">なし</div>'+
+      habitDefs.map(function(h){return '<div class="habit-link-btn'+(linkedHabitId===String(h.id)?' selected':'')+'" onclick="selectHabitLink(''+h.id+'',this)">'+h.name+'</div>';}).join('');
+  }
   document.getElementById('notifHint').classList.toggle('visible',!task.time);
   document.getElementById('modalOverlay').classList.add('open');
 }
@@ -656,6 +723,22 @@ function selectRepeat(el,mode){
   el.classList.add('selected');
   var info={none:'',daily:'未完了のまま翌日になると、日付が自動で次の日に更新されます。',weekly:'毎週同じ曜日に新しいタスクが自動作成されます。',monthly:'毎月同じ日に新しいタスクが自動作成されます。'};
   document.getElementById('repeatInfo').textContent=info[mode]||'';
+  // 毎日のとき習慣リンク欄を表示
+  var row=document.getElementById('habitLinkRow');
+  if(mode==='daily'){
+    row.classList.add('visible');
+    var opts=document.getElementById('habitLinkOpts');
+    opts.innerHTML='<div class="habit-link-btn'+(linkedHabitId===null?' selected':'')+'" onclick="selectHabitLink(null,this)">なし</div>'+
+      habitDefs.map(function(h){return '<div class="habit-link-btn'+(linkedHabitId===h.id?' selected':'')+'" onclick="selectHabitLink(''+h.id+'',this)">'+h.name+'</div>';}).join('');
+  }else{
+    row.classList.remove('visible');
+    linkedHabitId=null;
+  }
+}
+function selectHabitLink(id,el){
+  linkedHabitId=id;
+  document.querySelectorAll('.habit-link-btn').forEach(function(b){b.classList.remove('selected');});
+  el.classList.add('selected');
 }
 function selectTag(el,name){var already=el.classList.contains('selected');document.querySelectorAll('.tag-option:not(.add-tag)').forEach(function(t){t.classList.remove('selected');});if(!already){el.classList.add('selected');selectedTag=name;}else selectedTag='';document.getElementById('customTagInput').classList.remove('visible');isCustomTag=false;}
 function showCustomTag(){document.querySelectorAll('.tag-option:not(.add-tag)').forEach(function(t){t.classList.remove('selected');});selectedTag='';isCustomTag=true;var i=document.getElementById('customTagInput');i.classList.add('visible');i.focus();}
@@ -667,16 +750,17 @@ async function submitModal(){
   var time=document.getElementById('inputTime').value;
   var tag=isCustomTag?document.getElementById('customTagInput').value.trim():selectedTag;
   var repeat=repeatMode||'none';
+  var linked_habit=repeat==='daily'?linkedHabitId:null;
   var notif=notifOn&&!!time;
   closeModal();showSync(true);
   if(editingId){
-    var res=await sb.from('tasks').update({title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat}).eq('id',editingId).select().single();
+    var res=await sb.from('tasks').update({title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat,linked_habit:linked_habit}).eq('id',editingId).select().single();
     showSync(false);
-    if(!res.error){var task=tasks.find(function(t){return t.id===editingId;});if(task){Object.assign(task,{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat});scheduleNotif(task);}}
+    if(!res.error){var task=tasks.find(function(t){return t.id===editingId;});if(task){Object.assign(task,{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,repeat:repeat,linked_habit:linked_habit});scheduleNotif(task);}}
   }else{
-    var res=await sb.from('tasks').insert([{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false,repeat:repeat}]).select().single();
+    var res=await sb.from('tasks').insert([{title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false,repeat:repeat,linked_habit:linked_habit}]).select().single();
     showSync(false);
-    if(!res.error){var nt={id:res.data.id,title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false,repeat:repeat,createdAt:new Date(res.data.created_at)};tasks.push(nt);if(notif)requestNotifPermission(function(){scheduleNotif(nt);});}
+    if(!res.error){var nt={id:res.data.id,title:title,memo:memo,date:date,time:time,notif:notif,tag:tag,urgent:urgentOn,done:false,repeat:repeat,linked_habit:linked_habit,createdAt:new Date(res.data.created_at)};tasks.push(nt);if(notif)requestNotifPermission(function(){scheduleNotif(nt);});}
   }
   render();
 }
@@ -693,8 +777,12 @@ async function init(){
   showSync(true);
   // tasks
   var tr=await sb.from('tasks').select('*').order('created_at',{ascending:true});
-  if(!tr.error&&tr.data){
-    tasks=tr.data.map(function(r){return{id:r.id,title:r.title,memo:r.memo||'',date:r.date||'',time:r.time||'',notif:!!r.notif,tag:r.tag||'',urgent:!!r.urgent,done:!!r.done,repeat:r.repeat||'none',createdAt:new Date(r.created_at)};});
+  if(tr.error){
+    console.error('Supabase tasks load error:',tr.error);
+    showSync(false);render();renderHabitTable();scheduleAll();return;
+  }
+  if(tr.data){
+    tasks=tr.data.map(function(r){return{id:r.id,title:r.title,memo:r.memo||'',date:r.date||'',time:r.time||'',notif:!!r.notif,tag:r.tag||'',urgent:!!r.urgent,done:!!r.done,repeat:r.repeat||'none',linked_habit:r.linked_habit||null,createdAt:new Date(r.created_at)};});
   }
   // habit_items
   var hr=await sb.from('habit_items').select('*').order('sort_order',{ascending:true});
@@ -731,9 +819,10 @@ async function processRepeatTasks(){
     var td2=new Date(t.date+'T00:00');td2.setHours(0,0,0,0);
     if(td2>=today)continue; // 今日以降はスキップ
     if(t.repeat==='daily'){
-      // 未完了のまま日付が過ぎていたら今日に更新
+      // 未完了のまま日付が過ぎていたら今日に更新（完了済みは動かさない）
+      if(t.done)continue;
       t.date=td;
-      await sb.from('tasks').update({date:td,done:false}).eq('id',t.id);
+      await sb.from('tasks').update({date:td}).eq('id',t.id);
     } else if(t.repeat==='weekly'){
       // 前回から7日後に新タスク作成
       var nextDate=new Date(td2);nextDate.setDate(td2.getDate()+7);
