@@ -415,14 +415,17 @@ async function toggleHabit(hid,ds){
   if(document.getElementById('graphOverlay').classList.contains('open'))renderGraph();
   // チェックON時に褒めバブル
   if(!wasChecked){
-    var dotEl=event&&event.target;
-    if(dotEl){
-      var rect=dotEl.getBoundingClientRect();
-      var b=document.createElement('div');b.className='habit-praise';
-      b.textContent=praises[Math.floor(Math.random()*praises.length)];
-      b.style.left=rect.left+'px';b.style.top=(rect.top-36)+'px';
-      document.body.appendChild(b);setTimeout(function(){b.remove();},1700);
-    }
+    try{
+      var dotEl=event&&event.target;
+      if(dotEl){
+        var rect=dotEl.getBoundingClientRect();
+        var b=document.createElement('div');b.className='habit-praise';
+        b.textContent=praises[Math.floor(Math.random()*praises.length)];
+        b.style.left=(rect.left+rect.width/2-40)+'px';
+        b.style.top=(rect.top+window.scrollY-44)+'px';
+        document.body.appendChild(b);setTimeout(function(){b.remove();},1700);
+      }
+    }catch(e){}
   }
   // Supabaseに保存（失敗したらロールバック）
   var res;
@@ -627,7 +630,7 @@ async function toggleTaskNotif(id,e){
 }
 function askDelete(id,e){if(e)e.stopPropagation();var task=tasks.find(function(t){return t.id===id;});if(!task)return;pendingDeleteId=id;document.getElementById('confirmSub').textContent='「'+task.title+'」を削除します';document.getElementById('confirmOverlay').classList.add('open');}
 function closeConfirm(){document.getElementById('confirmOverlay').classList.remove('open');pendingDeleteId=null;}
-function confirmDelete(){if(!pendingDeleteId)return;tasks=tasks.filter(function(t){return t.id!==pendingDeleteId;});if(notifTimers[pendingDeleteId]){clearTimeout(notifTimers[pendingDeleteId]);delete notifTimers[pendingDeleteId];}closeConfirm();closeModal();save();render();}
+async function confirmDelete(){if(!pendingDeleteId)return;var did=pendingDeleteId;tasks=tasks.filter(function(t){return t.id!==did;});if(notifTimers[did]){clearTimeout(notifTimers[did]);delete notifTimers[did];}closeConfirm();closeModal();render();await sb.from('tasks').delete().eq('id',did);}
 function deleteFromModal(){if(editingId)askDelete(editingId,null);}
 function spawnSparkles(container){
   if(!container)return;
@@ -775,34 +778,41 @@ function showSync(on){
 // ── 初期ロード ──
 async function init(){
   showSync(true);
-  // tasks
-  var tr=await sb.from('tasks').select('*').order('created_at',{ascending:true});
-  if(tr.error){
-    console.error('Supabase tasks load error:',tr.error);
-    showSync(false);render();renderHabitTable();scheduleAll();return;
-  }
-  if(tr.data){
-    tasks=tr.data.map(function(r){return{id:r.id,title:r.title,memo:r.memo||'',date:r.date||'',time:r.time||'',notif:!!r.notif,tag:r.tag||'',urgent:!!r.urgent,done:!!r.done,repeat:r.repeat||'none',linked_habit:r.linked_habit||null,createdAt:new Date(r.created_at)};});
-  }
-  // habit_items
-  var hr=await sb.from('habit_items').select('*').order('sort_order',{ascending:true});
-  if(!hr.error&&hr.data&&hr.data.length){
-    habitDefs=hr.data.map(function(r){return{id:r.id,emoji:r.emoji,name:r.name};});
-  }else if(!hr.error&&hr.data&&hr.data.length===0){
-    // デフォルト項目を挿入
-    var defaults=[{emoji:'💪',name:'運動',sort_order:0},{emoji:'📖',name:'読書',sort_order:1},{emoji:'💧',name:'水',sort_order:2}];
-    var dr=await sb.from('habit_items').insert(defaults).select();
-    if(!dr.error)habitDefs=dr.data.map(function(r){return{id:r.id,emoji:r.emoji,name:r.name};});
-  }
-  selGraphHabit=habitDefs[0]?habitDefs[0].id:null;
-  // habit_logs
-  var lr=await sb.from('habit_logs').select('item_id,log_date');
-  if(!lr.error&&lr.data){
-    habitLogs={};
-    lr.data.forEach(function(r){if(!habitLogs[r.item_id])habitLogs[r.item_id]={};habitLogs[r.item_id][r.log_date]=true;});
+  try {
+    // tasks: repeat/linked_habitカラムが存在しない場合に備えて安全に読み込み
+    var tr=await sb.from('tasks').select('*').order('created_at',{ascending:true});
+    if(!tr.error&&tr.data){
+      tasks=tr.data.map(function(r){
+        return{id:r.id,title:r.title||'',memo:r.memo||'',date:r.date||'',time:r.time||'',
+          notif:!!r.notif,tag:r.tag||'',urgent:!!r.urgent,done:!!r.done,
+          repeat:r.repeat||'none',linked_habit:r.linked_habit||null,
+          createdAt:new Date(r.created_at)};
+      });
+    }
+    // habit_items
+    var hr=await sb.from('habit_items').select('*').order('sort_order',{ascending:true});
+    if(!hr.error&&hr.data){
+      if(hr.data.length){
+        habitDefs=hr.data.map(function(r){return{id:r.id,emoji:r.emoji||'',name:r.name};});
+      }else{
+        // テーブルは存在するが空 → デフォルト挿入
+        var defaults=[{emoji:'',name:'習慣1',sort_order:0}];
+        var dr=await sb.from('habit_items').insert(defaults).select();
+        if(!dr.error&&dr.data)habitDefs=dr.data.map(function(r){return{id:r.id,emoji:'',name:r.name};});
+      }
+    }
+    selGraphHabit=habitDefs[0]?habitDefs[0].id:null;
+    // habit_logs
+    var lr=await sb.from('habit_logs').select('item_id,log_date');
+    if(!lr.error&&lr.data){
+      habitLogs={};
+      lr.data.forEach(function(r){if(!habitLogs[r.item_id])habitLogs[r.item_id]={};habitLogs[r.item_id][r.log_date]=true;});
+    }
+  } catch(e) {
+    console.error('init error:', e);
   }
   showSync(false);
-  processRepeatTasks();
+  try { processRepeatTasks(); } catch(e){ console.error('repeat error:',e); }
   render();
   renderHabitTable();
   scheduleAll();
