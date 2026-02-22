@@ -470,9 +470,9 @@ async function toggleHabit(hid,ds){
   // Supabaseに保存（失敗したらロールバック）
   var res;
   if(wasChecked){
-    res=await sb.from('habit_logs').delete().eq('item_id',hid).eq('log_date',ds);
+    res=await sb.from('habit_logs').delete().eq('item_id',parseInt(hid)).eq('log_date',ds);
   }else{
-    res=await sb.from('habit_logs').insert([{item_id:hid,log_date:ds}]);
+    res=await sb.from('habit_logs').insert([{item_id:parseInt(hid),log_date:ds}]);
   }
   if(res.error){
     // ロールバック
@@ -515,7 +515,7 @@ async function addHabitItem(){
 }
 async function removeHabitItem(id){
   await sb.from('habit_items').delete().eq('id',id);
-  await sb.from('habit_logs').delete().eq('item_id',id);
+  await sb.from('habit_logs').delete().eq('item_id',parseInt(id));
   habitDefs=habitDefs.filter(function(h){return h.id!==id;});
   delete habitLogs[id];
   renderHabitItemList();renderHabitTable();
@@ -650,7 +650,8 @@ async function toggleTask(id,e){
       if(!habitLogs[lhKey][ds]){
         habitLogs[lhKey][ds]=true;
         renderHabitTable();
-        sb.from('habit_logs').insert([{item_id:parseInt(task.linked_habit),log_date:ds}]);
+        var lhRes=await sb.from('habit_logs').insert([{item_id:parseInt(task.linked_habit),log_date:ds}]);
+        if(lhRes.error){console.error('habit_log insert error:',lhRes.error);delete habitLogs[lhKey][ds];renderHabitTable();}
       }
     }
     setTimeout(function(){render();},1200);
