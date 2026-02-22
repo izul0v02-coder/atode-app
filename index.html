@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>あとで</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="あとで">
+  <meta name="theme-color" content="#e8673a">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
   :root{--bg:#e8e8e8;--bg2:#dcdcdc;--card:#f4f4f4;--card-done:#d8d8d8;--text:#111;--text-sub:#888;--border:#d0d0d0;--shadow:rgba(0,0,0,.07);--accent:#111;--al:#444;--ap:#e0e0e0;--ab:#eeeeee;--dc:#111;}
@@ -239,10 +244,31 @@
   .time-chip-btn.selected{background:var(--ap);border-color:var(--al);color:var(--accent);font-weight:600;}
   .time-custom-wrap{display:flex;align-items:center;gap:6px;margin-top:6px;}
   .time-custom-label{font-size:12px;color:var(--text-sub);white-space:nowrap;}
+  /* パスワード画面 */
+  .pw-screen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:40px;}
+  .pw-screen.hidden{display:none;}
+  .pw-title{font-family:'DM Sans',sans-serif;font-size:28px;font-weight:700;color:var(--text);letter-spacing:-.5px;}
+  .pw-title span{color:var(--accent);}
+  .pw-sub{font-size:13px;color:var(--text-sub);}
+  .pw-input-wrap{width:100%;max-width:300px;display:flex;flex-direction:column;gap:10px;}
+  .pw-input{width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;font-size:16px;color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;text-align:center;letter-spacing:3px;transition:border-color .2s;}
+  .pw-input:focus{border-color:var(--accent);}
+  .pw-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:filter .2s;}
+  .pw-btn:active{filter:brightness(.9);}
+  .pw-error{font-size:12px;color:#e04040;text-align:center;min-height:18px;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+<div class="pw-screen" id="pwScreen">
+  <div class="pw-title">あとで<span>.</span></div>
+  <div class="pw-sub">パスワードを入力してください</div>
+  <div class="pw-input-wrap">
+    <input class="pw-input" id="pwInput" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkPw()">
+    <button class="pw-btn" onclick="checkPw()">入る</button>
+    <div class="pw-error" id="pwError"></div>
+  </div>
+</div>
 <div class="notif-banner" id="notifBanner">
   <span>⏰</span>
   <div><div id="notifBannerText"></div><div style="font-size:11px;opacity:.7" id="notifBannerSub"></div></div>
@@ -408,9 +434,9 @@ function renderHabitTable(){
   if(!wrap)return;
   if(!habitDefs.length){wrap.innerHTML='<div style="font-size:12px;color:var(--text-sub);padding:6px 0 10px">「編集」から習慣を追加してください</div>';return;}
   var today=new Date();today.setHours(0,0,0,0);
-  var dow=(today.getDay()+6)%7;
+  var dow=today.getDay(); // 日曜=0
   var wkStart=new Date(today);wkStart.setDate(today.getDate()-dow);
-  var DL=['月','火','水','木','金','土','日'];
+  var DL=['日','月','火','水','木','金','土'];
   var dates=[];
   for(var i=0;i<7;i++){var d=new Date(wkStart);d.setDate(wkStart.getDate()+i);dates.push(d);}
   var html='<table class="habit-table"><thead><tr><th class="habit-lbl-cell"></th>';
@@ -445,10 +471,17 @@ async function toggleHabit(hid,ds){
     try{
       var dotEl=event&&event.target;
       if(dotEl){
+        // キラキラ
+        var sc=document.createElement('div');
+        sc.style.cssText='position:fixed;left:'+(dotEl.getBoundingClientRect().left-8)+'px;top:'+(dotEl.getBoundingClientRect().top-8)+'px;width:24px;height:24px;pointer-events:none;z-index:9999;';
+        document.body.appendChild(sc);
+        spawnSparkles(sc);
+        setTimeout(function(){sc.remove();},900);
+        // 褒めバブル
         var rect=dotEl.getBoundingClientRect();
         var b=document.createElement('div');b.className='habit-praise';
         b.textContent=praises[Math.floor(Math.random()*praises.length)];
-        b.style.left=(rect.left+rect.width/2-40)+'px';
+        b.style.left=Math.max(8,rect.left+rect.width/2-40)+'px';
         b.style.top=(rect.top+window.scrollY-44)+'px';
         document.body.appendChild(b);setTimeout(function(){b.remove();},1700);
       }
@@ -570,7 +603,8 @@ function toggleSort(){sortByDate=!sortByDate;localStorage.setItem('atode_sort',s
 function switchTab(tab,el){currentTab=tab;localStorage.setItem('atode_tab',tab);document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});el.classList.add('active');render();}
 function getFiltered(){
   var t=tasks.slice();
-  if(currentTab==='todo')t=t.filter(function(x){return!x.done;});
+  if(currentTab==='all')t=t.filter(function(x){return!x.done;});
+  else if(currentTab==='todo')t=t.filter(function(x){return!x.done;});
   else if(currentTab==='done')t=t.filter(function(x){return x.done;});
   else if(currentTab==='urgent')t=t.filter(function(x){return x.urgent&&!x.done;});
   if(sortByDate)t.sort(function(a,b){var da=a.date||'9999',db=b.date||'9999';return da<db?-1:da>db?1:a.createdAt-b.createdAt;});
@@ -631,9 +665,10 @@ async function toggleTask(id,e){
     // 連動ハビットがあればチェック
     if(task.linked_habit){
       var ds=todayStr();
-      if(!habitLogs[task.linked_habit])habitLogs[task.linked_habit]={};
-      if(!habitLogs[task.linked_habit][ds]){
-        habitLogs[task.linked_habit][ds]=true;
+      var lhKey=String(task.linked_habit);
+      if(!habitLogs[lhKey])habitLogs[lhKey]={};
+      if(!habitLogs[lhKey][ds]){
+        habitLogs[lhKey][ds]=true;
         renderHabitTable();
         sb.from('habit_logs').insert([{item_id:parseInt(task.linked_habit),log_date:ds}]);
       }
@@ -892,8 +927,8 @@ async function processRepeatTasks(){
     if(!t.date)continue;
     var taskDate=new Date(t.date+'T00:00');taskDate.setHours(0,0,0,0);
     if(taskDate>=today)continue; // まだ期限来てない
-    if(t.repeat==='daily'&&!t.done){
-      toUpdate.push(t);
+    if(t.repeat==='daily'){
+      toUpdate.push(t); // 完了済みも日付更新+未完了にリセット
     } else if(t.repeat==='weekly'&&t.done){
       // 完了済みweeklyのみ次を作成
       var nextD=new Date(taskDate);nextD.setDate(taskDate.getDate()+7);
@@ -910,7 +945,9 @@ async function processRepeatTasks(){
   }
   for(var i=0;i<toUpdate.length;i++){
     var t=toUpdate[i];
+    if(t.date===td)continue; // 既に今日なら更新不要
     t.date=td;
+    t.done=false;
     await sb.from('tasks').update({date:td,done:false}).eq('id',t.id);
   }
   var inserts=toInsertWeekly.concat(toInsertMonthly);
@@ -921,7 +958,13 @@ async function processRepeatTasks(){
   }
 }
 
+
 init();
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('/sw.js').catch(function(){});
+  });
+}
 </script>
 </body>
 </html>
